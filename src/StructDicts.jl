@@ -4,17 +4,16 @@ using Unrolled
 
 export StructDict
 
-mutable struct StructDict{I,C}
-	const del::Base.RefValue{Bool}
-	const nextlastid::Base.RefValue{I}
-	const id_to_index::Dict{I, Int}
+mutable struct StructDict{C}
+	del::Bool
+    nextlastid::Int
+	const id_to_index::Dict{Int, Int}
 	const components::C
-    StructDict(components::NamedTuple) = StructDict{UInt64}(components)
-	function StructDict{I}(components::NamedTuple) where {I<:Union{Signed,Unsigned}}
+	function StructDict(components::NamedTuple)
 		allequal(length.(values(components))) || error("All components must have equal length.")
-		len = I(length(first(components)))
+		len = length(first(components))
 		comps = merge((ID=collect(1:len),), components)
-		return new{I,typeof(comps)}(Ref(false), Ref(len), Dict{I,Int}(), comps)
+		return new{typeof(comps)}(false, len, Dict{Int,Int}(), comps)
 	end
 end
 
@@ -26,13 +25,13 @@ end
 
 Base.getproperty(sdict::StructDict, name::Symbol) = getfield(sdict, :components)[name]
 
-function Base.delete!(sdict::StructDict, id::Union{Signed,Unsigned})
+function Base.delete!(sdict::StructDict, id::Int)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
 	del, ID = getfield(sdict, :del), getfield(comps, :ID)
-    if !(del[])
-        del[] = true
+    if !(del)
+        setfield!(sdict, :del, true)
         for pid in ID
-            id_to_index[pid] = pid % Int
+            id_to_index[pid] = pid
         end
     end
     i = id_to_index[id]
@@ -47,10 +46,10 @@ function Base.push!(sdict::StructDict, t::NamedTuple)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     fieldnames(typeof(comps))[2:end] != keys(t) && error("The tuple fields do not match the container fields")
     ID, lastid = getfield(comps, :ID), getfield(sdict, :nextlastid)
-    nextlastid = (lastid[] += 1)
+    nextlastid = setfield!(sdict, :nextlastid, lastid + 1)
     push!(ID, nextlastid)
     unrolled_map(push!, values(comps)[2:end], t)
-    getfield(sdict, :del)[] && (id_to_index[nextlastid] = length(ID))
+    getfield(sdict, :del) && (id_to_index[nextlastid] = length(ID))
     return sdict
 end
 
@@ -70,50 +69,45 @@ Base.eltype(::Keys{T}) where T = T
 
 lastkey(sdict::StructDict) = getfield(sdict, :nextlastid)[]
 
-struct Struct{I, S}
-    id::I
+struct Struct{S}
+    id::Int
+    lasti::Int
     sdict::S
 end
 
-@inline function Base.getindex(sdict::StructDict, id::Union{Signed,Unsigned})
+@inline function Base.getindex(sdict::StructDict, id::Int)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
-    del = getfield(sdict, :del)[]
-    del && !(id in keys(id_to_index)) && error("No agent with the specified id")
-    !del && checkbounds(getfield(comps, :ID), id%Int)
-    return Struct(id, sdict)
+    del = getfield(sdict, :del)
+    i = del ? id_to_index[id] : id
+    checkbounds(getfield(comps, :ID), i)
+    return Struct(id, i, sdict)
 end
 
 @inline function Base.getproperty(a::Struct, name::Symbol)
     id, sdict = getfield(a, :id), getfield(a, :sdict)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
-    del = getfield(sdict, :del)[]
-    if del
-        i = id_to_index[id]
-        return @inbounds getfield(comps, name)[i]
-    else
-        i = id % Int
-        return getfield(comps, name)[i]
-    end
+    del, f = getfield(sdict, :del), getfield(comps, name)
+    !del && return f[id]
+    lasti, ID = getfield(a, :lasti), getfield(comps, :ID)
+    lasti <= length(ID) && (@inbounds ID[lasti] == id) && return @inbounds f[lasti]
+    return @inbounds f[id_to_index[id]]
 end
 
 @inline function Base.setproperty!(a::Struct, name::Symbol, x)
     id, sdict = getfield(a, :id), getfield(a, :sdict)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
-    del = getfield(sdict, :del)[]
-    if del
-        i = id_to_index[id]
-        return (@inbounds getfield(comps, name)[i] = x)
-    else
-        i = id % Int
-        return (getfield(comps, name)[i] = x)
-    end
+    del, f = getfield(sdict, :del), getfield(comps, name)
+    !del && return (f[id] = x)
+    lasti, ID = getfield(a, :lasti), getfield(comps, :ID)
+    lasti <= length(ID) && (@inbounds ID[lasti] == id) && return (@inbounds f[lasti] = x)
+    return (@inbounds f[id_to_index[id]] = x)
 end
 
 function getfields(a::Struct)
     id, sdict = getfield(a, :id), getfield(a, :sdict)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
-    del = getfield(sdict, :del)[]
-    i = del ? id_to_index[id] : id % Int
+    del = getfield(sdict, :del)
+    i = del ? id_to_index[id] : id
     checkbounds(getfield(comps, :ID), i)
     getindexi = ar -> @inbounds ar[i]
     vals = unrolled_map(getindexi, values(comps))
@@ -126,7 +120,7 @@ id(a::Struct) = getfield(a, :id)
 function Base.show(io::IO, ::MIME"text/plain", x::Struct)
     id, sdict = getfield(x, :id), getfield(x, :sdict)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
-    i = get(id_to_index, id, id % Int)
+    i = del ? id_to_index[id] : id
     fields = NamedTuple(y => getfield(comps, y)[i] for y in fieldnames(typeof(comps)))
     return print(io, "Struct$fields")
 end
