@@ -24,20 +24,22 @@ function remove!(a, i)
     return
 end
 
-function Base.delete!(sdict::StructDict, id::Unsigned)
-	comps = getfield(sdict, :components)
-	ID = getfield(comps, :ID)
-    if !(sdict.del[])
-        sdict.del[] = true
+Base.getproperty(sdict::StructDict, name::Symbol) = getfield(sdict, :components)[name]
+
+function Base.delete!(sdict::StructDict, id::Union{Signed,Unsigned})
+    comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
+	del, ID = getfield(sdict, :del), getfield(comps, :ID)
+    if !(del[])
+        del[] = true
         for pid in ID
-            sdict.id_to_index[pid] = id % Int
+            id_to_index[pid] = pid % Int
         end
     end
-    i = sdict.id_to_index[id]
+    i = id_to_index[id]
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
-    delete!(sdict.id_to_index, id)
-    i <= length(ID) && (sdict.id_to_index[(@inbounds ID[i])] = i)
+    delete!(id_to_index, id)
+    i <= length(ID) && (id_to_index[(@inbounds ID[i])] = i)
     return sdict
 end
 
@@ -66,27 +68,27 @@ struct Struct{I, S}
     sdict::S
 end
 
-Base.getindex(sdict::StructDict, id::Unsigned) = Struct(id, sdict)
+function Base.getindex(sdict::StructDict, id::Union{Signed,Unsigned}) = Struct(id, sdict)
 
 function Base.getproperty(a::Struct, name::Symbol)
     id, sdict = getfield(a, :id), getfield(a, :sdict)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     i = get(id_to_index, id, id % Int)
-    return (@inbounds getfield(comps, name)[i])
+    return getfield(comps, name)[i]
 end
 
 function Base.setproperty!(a::Struct, name::Symbol, x)
     id, sdict = getfield(a, :id), getfield(a, :sdict)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     i = get(id_to_index, id, id % Int)
-    return (@inbounds getfield(comps, name)[i] = x)
+    return (getfield(comps, name)[i] = x)
 end
 
 function getfields(a::Struct)
     id, sdict = getfield(a, :id), getfield(a, :sdict)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     i = get(id_to_index, id, id % Int)
-    getindexi = ar -> @inbounds ar[i]
+    getindexi = ar -> ar[i]
     vals = unrolled_map(getindexi, values(comps))
     names = fieldnames(typeof(comps))
     return NamedTuple{names}(vals)
