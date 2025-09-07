@@ -29,12 +29,7 @@ function Base.deleteat!(sdict::IndexedStructVector, i::Int)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     del, ID = getfield(sdict, :del), getfield(comps, :ID)
     checkbounds(ID, i)
-    if !del
-        setfield!(sdict, :del, true)
-        for pid in ID
-            id_to_index[pid] = pid
-        end
-    end
+    !del && setfield!(sdict, :del, true)
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
     delete!(id_to_index, id)
@@ -45,13 +40,8 @@ end
 function Base.delete!(sdict::IndexedStructVector, id::Int)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
 	del, ID = getfield(sdict, :del), getfield(comps, :ID)
-    if !del
-        setfield!(sdict, :del, true)
-        for pid in ID
-            id_to_index[pid] = pid
-        end
-    end
-    i = id_to_index[id]
+    !del && setfield!(sdict, :del, true)
+    i = (id <= length(ID) && (@inbounds ID[id] == id)) ? id : id_to_index[id]
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
     delete!(id_to_index, id)
@@ -95,8 +85,9 @@ lastkey(sdict::IndexedStructVector) = getfield(sdict, :nextlastid)
 
 @inline function Base.getindex(sdict::IndexedStructVector, id::Int)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
-    del = getfield(sdict, :del)
-    i = del ? id_to_index[id] : id
+    del, ID = getfield(sdict, :del), getfield(comps, :ID)
+    i = !del ? id : 
+        ((id <= length(ID) && (@inbounds ID[id] == id)) ? id : id_to_index[id])
     checkbounds(getfield(comps, :ID), i)
     return Struct(id, i, sdict)
 end
@@ -143,13 +134,13 @@ end
     return NamedTuple{names}(vals)
 end
 
-id(a::Struct) = getfield(a, :id)
-
 function Base.show(io::IO, ::MIME"text/plain", x::Struct)
     id, sdict = getfield(x, :id), getfield(x, :sdict)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     del = getfield(sdict, :del)
-    i = del ? id_to_index[id] : id
+    lasti, ID = getfield(x, :lasti), getfield(comps, :ID)
+    i = !del ? id : 
+        ((lasti <= length(ID) && (@inbounds ID[lasti] == id)) ? lasti : id_to_index[id])
     fields = NamedTuple(y => getfield(comps, y)[i] for y in fieldnames(typeof(comps)))
     return print(io, "Struct$fields")
 end
