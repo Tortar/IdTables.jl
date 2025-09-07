@@ -1,4 +1,4 @@
-name = "StructDicts"
+name = "IndexedStructArrays"
 uuid = "943997de-97ed-46fb-843d-45d8ceac30b4"
 authors = ["tortar <adrianomeligrana@proton.me> and contributors"]
 version = "0.0.0"

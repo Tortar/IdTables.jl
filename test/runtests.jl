@@ -1,6 +1,6 @@
-using StructDicts
+using IndexedStructArrays
 using Test
 
-@testset "StructDicts.jl" begin
+@testset "IndexedStructArrays.jl" begin
     # Write your tests here.
 end
