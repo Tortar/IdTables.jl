@@ -92,16 +92,16 @@ lastkey(sdict::IndexedStructVector) = getfield(sdict, :nextlastid)
     else
         i = 1 <= id <= length(ID) && (@inbounds ID[id] == id) ? id : id_to_index[id]
     end
-    return Struct(id, i, sdict)
+    return IndexedStruct(id, i, sdict)
 end
 
-struct Struct{S<:IndexedStructVector}
+struct IndexedStruct{S<:IndexedStructVector}
     id::Int64
     lasti::Int
     sdict::S
 end
 
-@inline function Base.getproperty(a::Struct, name::Symbol)
+@inline function Base.getproperty(a::IndexedStruct, name::Symbol)
     id, sdict = getfield(a, :id), getfield(a, :sdict)
     comps = getfield(sdict, :components)
     del, f = getfield(sdict, :del), getfield(comps, name)
@@ -112,7 +112,7 @@ end
     return @inbounds f[id_to_index[id]]
 end
 
-@inline function Base.setproperty!(a::Struct, name::Symbol, x)
+@inline function Base.setproperty!(a::IndexedStruct, name::Symbol, x)
     id, sdict = getfield(a, :id), getfield(a, :sdict)
     comps = getfield(sdict, :components)
     del, f = getfield(sdict, :del), getfield(comps, name)
@@ -123,7 +123,7 @@ end
     return (@inbounds f[id_to_index[id]] = x)
 end
 
-@inline function getfields(a::Struct)
+@inline function getfields(a::IndexedStruct)
     id, sdict = getfield(a, :id), getfield(a, :sdict)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     del = getfield(sdict, :del)
@@ -137,7 +137,7 @@ end
     return NamedTuple{names}(vals)
 end
 
-function Base.show(io::IO, ::MIME"text/plain", x::Struct)
+function Base.show(io::IO, ::MIME"text/plain", x::IndexedStruct)
     id, sdict = getfield(x, :id), getfield(x, :sdict)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     del = getfield(sdict, :del)
@@ -145,10 +145,10 @@ function Base.show(io::IO, ::MIME"text/plain", x::Struct)
     i = !del ? id : 
         ((lasti <= length(ID) && (@inbounds ID[lasti] == id)) ? lasti : id_to_index[id])
     fields = NamedTuple(y => getfield(comps, y)[i] for y in fieldnames(typeof(comps)))
-    return print(io, "Struct$fields")
+    return print(io, "IndexedStruct$fields")
 end
 
-function Base.in(a::Struct, sdict::IndexedStructVector)
+function Base.in(a::IndexedStruct, sdict::IndexedStructVector)
     id, comps = getfield(a, :id), getfield(sdict, :components)
     del, ID = getfield(sdict, :del), getfield(comps, :ID)
     !del && return 1 <= id <= length(ID)
