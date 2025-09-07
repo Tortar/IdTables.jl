@@ -33,7 +33,7 @@ function Base.deleteat!(sdict::IndexedStructVector, i::Int)
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
     delete!(id_to_index, id)
-    i <= length(ID) && (id_to_index[(@inbounds ID[i])] = i)
+    id_to_index[ID[i]] = i
     return sdict
 end
 
@@ -41,7 +41,7 @@ function Base.delete!(sdict::IndexedStructVector, id::Int)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
 	del, ID = getfield(sdict, :del), getfield(comps, :ID)
     !del && setfield!(sdict, :del, true)
-    i = (id <= length(ID) && (@inbounds ID[id] == id)) ? id : id_to_index[id]
+    i = (1 <= id <= length(ID) && (@inbounds ID[id] == id)) ? id : id_to_index[id]
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
     delete!(id_to_index, id)
@@ -86,9 +86,12 @@ lastkey(sdict::IndexedStructVector) = getfield(sdict, :nextlastid)
 @inline function Base.getindex(sdict::IndexedStructVector, id::Int)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     del, ID = getfield(sdict, :del), getfield(comps, :ID)
-    i = !del ? id : 
-        ((id <= length(ID) && (@inbounds ID[id] == id)) ? id : id_to_index[id])
-    checkbounds(getfield(comps, :ID), i)
+    if !del
+        checkbounds(getfield(comps, :ID), id)
+        i = id
+    else
+        i = 1 <= id <= length(ID) && (@inbounds ID[id] == id) ? id : id_to_index[id]
+    end
     return Struct(id, i, sdict)
 end
 
