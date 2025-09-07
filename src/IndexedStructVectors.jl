@@ -1,8 +1,8 @@
-module StructDicts
+module IndexedStructVectors
 
 using Unrolled
 
-export StructDict, getfields
+export IndexedStructVector, getfields
 
 function remove!(a, i)
     @inbounds a[i], a[end] = a[end], a[i]
@@ -10,12 +10,12 @@ function remove!(a, i)
     return
 end
 
-mutable struct StructDict{C}
+mutable struct IndexedStructVector{C}
 	del::Bool
     nextlastid::Int64
 	const id_to_index::Dict{Int64, Int}
 	const components::C
-	function StructDict(components::NamedTuple)
+	function IndexedStructVector(components::NamedTuple)
 		allequal(length.(values(components))) || error("All components must have equal length")
 		len = length(first(components))
 		comps = merge((ID=collect(1:len),), components)
@@ -23,9 +23,9 @@ mutable struct StructDict{C}
 	end
 end
 
-Base.getproperty(sdict::StructDict, name::Symbol) = getfield(sdict, :components)[name]
+Base.getproperty(sdict::IndexedStructVector, name::Symbol) = getfield(sdict, :components)[name]
 
-function Base.deleteat!(sdict::StructDict, i::Int)
+function Base.deleteat!(sdict::IndexedStructVector, i::Int)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     del, ID = getfield(sdict, :del), getfield(comps, :ID)
     checkbounds(ID, i)
@@ -42,7 +42,7 @@ function Base.deleteat!(sdict::StructDict, i::Int)
     return sdict
 end
 
-function Base.delete!(sdict::StructDict, id::Int)
+function Base.delete!(sdict::IndexedStructVector, id::Int)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
 	del, ID = getfield(sdict, :del), getfield(comps, :ID)
     if !del
@@ -59,7 +59,7 @@ function Base.delete!(sdict::StructDict, id::Int)
     return sdict
 end
 
-function Base.push!(sdict::StructDict, t::NamedTuple)
+function Base.push!(sdict::IndexedStructVector, t::NamedTuple)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     fieldnames(typeof(comps))[2:end] != keys(t) && error("Tuple fields do not match container fields")
     ID, lastid = getfield(comps, :ID), getfield(sdict, :nextlastid)
@@ -70,7 +70,7 @@ function Base.push!(sdict::StructDict, t::NamedTuple)
     return sdict
 end
 
-function Base.show(io::IO, ::MIME"text/plain", x::StructDict{C}) where C
+function Base.show(io::IO, ::MIME"text/plain", x::IndexedStructVector{C}) where C
     comps = getfield(x, :components)
     sC = string(C)[13:end]
     print("IndexedStructVector{$sC")
@@ -81,7 +81,7 @@ struct Keys{T,I}
     t::T
 	ID::I
 end
-function Base.keys(sdict::StructDict)
+function Base.keys(sdict::IndexedStructVector)
     ID = getfield(getfield(sdict, :components), :ID)
     return Keys(eltype(ID), ID)
 end
@@ -91,9 +91,9 @@ Base.IteratorSize(::Keys) = Base.HasLength()
 Base.length(k::Keys) = length(k.ID)
 Base.eltype(::Keys{T}) where T = T
 
-lastkey(sdict::StructDict) = getfield(sdict, :nextlastid)
+lastkey(sdict::IndexedStructVector) = getfield(sdict, :nextlastid)
 
-@inline function Base.getindex(sdict::StructDict, id::Int)
+@inline function Base.getindex(sdict::IndexedStructVector, id::Int)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     del = getfield(sdict, :del)
     i = del ? id_to_index[id] : id
@@ -101,7 +101,7 @@ lastkey(sdict::StructDict) = getfield(sdict, :nextlastid)
     return Struct(id, i, sdict)
 end
 
-struct Struct{S<:StructDict}
+struct Struct{S<:IndexedStructVector}
     id::Int64
     lasti::Int
     sdict::S
@@ -154,7 +154,7 @@ function Base.show(io::IO, ::MIME"text/plain", x::Struct)
     return print(io, "Struct$fields")
 end
 
-function Base.in(a::Struct, sdict::StructDict)
+function Base.in(a::Struct, sdict::IndexedStructVector)
     id, comps = getfield(a, :id), getfield(sdict, :components)
     del, ID = getfield(sdict, :del), getfield(comps, :ID)
     !del && return 1 <= id <= length(ID)
@@ -163,7 +163,7 @@ function Base.in(a::Struct, sdict::StructDict)
     id_to_index = getfield(sdict, :id_to_index)
     return id in keys(id_to_index)
 end
-function Base.in(id::Int, sdict::StructDict)
+function Base.in(id::Int, sdict::IndexedStructVector)
     comps = getfield(sdict, :components)
     del, ID = getfield(sdict, :del), getfield(comps, :ID)
     !del && return 1 <= id <= length(ID)

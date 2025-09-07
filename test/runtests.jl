@@ -1,6 +1,6 @@
-using IndexedStructArrays
+using IndexedStructVectors
 using Test
 
-@testset "IndexedStructArrays.jl" begin
+@testset "IndexedStructVectors.jl" begin
     # Write your tests here.
 end
