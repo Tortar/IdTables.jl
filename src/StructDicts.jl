@@ -31,8 +31,8 @@ function Base.deleteat!(sdict::StructDict, i::Int)
     checkbounds(ID, i)
     if !del
         setfield!(sdict, :del, true)
-        for (i, pid) in enumerate(ID)
-            id_to_index[pid] = i
+        for pid in ID
+            id_to_index[pid] = pid
         end
     end
     removei! = a -> remove!(a, i)
@@ -47,8 +47,8 @@ function Base.delete!(sdict::StructDict, id::Int)
 	del, ID = getfield(sdict, :del), getfield(comps, :ID)
     if !del
         setfield!(sdict, :del, true)
-        for (i, pid) in enumerate(ID)
-            id_to_index[pid] = i
+        for pid in ID
+            id_to_index[pid] = pid
         end
     end
     i = id_to_index[id]
