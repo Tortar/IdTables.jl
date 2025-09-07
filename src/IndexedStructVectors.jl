@@ -28,11 +28,11 @@ Base.getproperty(sdict::IndexedStructVector, name::Symbol) = getfield(sdict, :co
 function Base.deleteat!(sdict::IndexedStructVector, i::Int)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     del, ID = getfield(sdict, :del), getfield(comps, :ID)
-    checkbounds(ID, i)
+    pid = ID[i]
     !del && setfield!(sdict, :del, true)
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
-    delete!(id_to_index, id)
+    delete!(id_to_index, pid)
     i <= length(ID) && (id_to_index[(@inbounds ID[i])] = i)
     return sdict
 end
