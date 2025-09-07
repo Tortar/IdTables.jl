@@ -33,7 +33,7 @@ function Base.deleteat!(sdict::IndexedStructVector, i::Int)
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
     delete!(id_to_index, id)
-    id_to_index[ID[i]] = i
+    i <= length(ID) && (id_to_index[(@inbounds ID[i])] = i)
     return sdict
 end
 
