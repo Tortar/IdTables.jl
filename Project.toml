@@ -1,7 +1,7 @@
 name = "IndexedStructVectors"
 uuid = "943997de-97ed-46fb-843d-45d8ceac30b4"
 authors = ["tortar <adrianomeligrana@proton.me> and contributors"]
-version = "0.0.0"
+version = "0.1.0"
 
 [deps]
 Unrolled = "9602ed7d-8fef-5bc8-8597-8f21381861e8"
