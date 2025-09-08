@@ -1,6 +1,6 @@
 
 using IndexedStructVectors
-using Test
+using Aqua, Test
 
 @testset "IndexedStructVectors.jl" begin
 
