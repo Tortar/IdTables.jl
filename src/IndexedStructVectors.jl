@@ -2,7 +2,7 @@ module IndexedStructVectors
 
 using Unrolled
 
-export IndexedStructVector, getfields
+export IndexedStructVector, getfields, id
 
 function remove!(a, i)
     @inbounds a[i], a[end] = a[end], a[i]
@@ -67,19 +67,17 @@ function Base.show(io::IO, ::MIME"text/plain", x::IndexedStructVector{C}) where 
     return display(comps)
 end
 
-struct Keys{T,I}
-    t::T
-	ID::I
+struct Keys
+	ID::Vector{Int64}
 end
 function Base.keys(sdict::IndexedStructVector)
-    ID = getfield(getfield(sdict, :components), :ID)
-    return Keys(eltype(ID), ID)
+    return Keys(getfield(getfield(sdict, :components), :ID))
 end
 Base.iterate(k::Keys) = Base.iterate(k.ID)
 Base.iterate(k::Keys, state) = Base.iterate(k.ID, state)
 Base.IteratorSize(::Keys) = Base.HasLength()
 Base.length(k::Keys) = length(k.ID)
-Base.eltype(::Keys{T}) where T = T
+Base.eltype(::Keys)= Int64
 
 lastkey(sdict::IndexedStructVector) = getfield(sdict, :nextlastid)
 
@@ -87,7 +85,7 @@ lastkey(sdict::IndexedStructVector) = getfield(sdict, :nextlastid)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     del, ID = getfield(sdict, :del), getfield(comps, :ID)
     if !del
-        checkbounds(getfield(comps, :ID), id)
+        checkbounds(ID, id)
         i = id
     else
         i = 1 <= id <= length(ID) && (@inbounds ID[id] == id) ? id : id_to_index[id]
@@ -100,6 +98,8 @@ struct IndexedStruct{S<:IndexedStructVector}
     lasti::Int
     sdict::S
 end
+
+id(a::IndexedStruct) = getfield(a, :id)
 
 @inline function Base.getproperty(a::IndexedStruct, name::Symbol)
     id, sdict = getfield(a, :id), getfield(a, :sdict)
@@ -163,6 +163,19 @@ function Base.in(id::Int, sdict::IndexedStructVector)
     !del && return 1 <= id <= length(ID)
     id_to_index = getfield(sdict, :id_to_index)
     return id in keys(id_to_index)
+end
+
+function Base.delete!(sdict::IndexedStructVector, a::IndexedStruct)
+    comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
+    del, ID = getfield(sdict, :del), getfield(comps, :ID)
+    id, lasti = getfield(a, :id), getfield(a, :lasti)
+    !del && setfield!(sdict, :del, true)
+    i = lasti <= length(ID) && (@inbounds ID[lasti] == id) ? lasti : id_to_index[id]
+    removei! = a -> remove!(a, i)
+    unrolled_map(removei!, values(comps))
+    delete!(id_to_index, id)
+    i <= length(ID) && (id_to_index[(@inbounds ID[i])] = i)
+    return sdict
 end
 
 end
