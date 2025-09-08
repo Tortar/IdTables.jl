@@ -90,18 +90,18 @@ lastkey(sdict::IndexedStructVector) = getfield(sdict, :nextlastid)
     else
         i = 1 <= id <= length(ID) && (@inbounds ID[id] == id) ? id : id_to_index[id]
     end
-    return IndexedStruct(id, i, sdict)
+    return IndexedView(id, i, sdict)
 end
 
-struct IndexedStruct{S<:IndexedStructVector}
+struct IndexedView{S<:IndexedStructVector}
     id::Int64
     lasti::Int
     sdict::S
 end
 
-id(a::IndexedStruct) = getfield(a, :id)
+id(a::IndexedView) = getfield(a, :id)
 
-@inline function Base.getproperty(a::IndexedStruct, name::Symbol)
+@inline function Base.getproperty(a::IndexedView, name::Symbol)
     id, sdict = getfield(a, :id), getfield(a, :sdict)
     comps = getfield(sdict, :components)
     del, f = getfield(sdict, :del), getfield(comps, name)
@@ -112,7 +112,7 @@ id(a::IndexedStruct) = getfield(a, :id)
     return @inbounds f[id_to_index[id]]
 end
 
-@inline function Base.setproperty!(a::IndexedStruct, name::Symbol, x)
+@inline function Base.setproperty!(a::IndexedView, name::Symbol, x)
     id, sdict = getfield(a, :id), getfield(a, :sdict)
     comps = getfield(sdict, :components)
     del, f = getfield(sdict, :del), getfield(comps, name)
@@ -123,7 +123,7 @@ end
     return (@inbounds f[id_to_index[id]] = x)
 end
 
-@inline function getfields(a::IndexedStruct)
+@inline function getfields(a::IndexedView)
     id, sdict = getfield(a, :id), getfield(a, :sdict)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     del = getfield(sdict, :del)
@@ -132,12 +132,12 @@ end
         ((lasti <= length(ID) && (@inbounds ID[lasti] == id)) ? lasti : id_to_index[id])
     checkbounds(getfield(comps, :ID), i)
     getindexi = ar -> @inbounds ar[i]
-    vals = unrolled_map(getindexi, values(comps))
-    names = fieldnames(typeof(comps))
+    vals = unrolled_map(getindexi, values(comps)[2:end])
+    names = fieldnames(typeof(comps))[2:end]
     return NamedTuple{names}(vals)
 end
 
-function Base.show(io::IO, ::MIME"text/plain", x::IndexedStruct)
+function Base.show(io::IO, ::MIME"text/plain", x::IndexedView)
     id, sdict = getfield(x, :id), getfield(x, :sdict)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     del = getfield(sdict, :del)
@@ -145,10 +145,10 @@ function Base.show(io::IO, ::MIME"text/plain", x::IndexedStruct)
     i = !del ? id : 
         ((lasti <= length(ID) && (@inbounds ID[lasti] == id)) ? lasti : id_to_index[id])
     fields = NamedTuple(y => getfield(comps, y)[i] for y in fieldnames(typeof(comps)))
-    return print(io, "IndexedStruct$fields")
+    return print(io, "IndexedView$fields")
 end
 
-function Base.in(a::IndexedStruct, sdict::IndexedStructVector)
+function Base.in(a::IndexedView, sdict::IndexedStructVector)
     id, comps = getfield(a, :id), getfield(sdict, :components)
     del, ID = getfield(sdict, :del), getfield(comps, :ID)
     !del && return 1 <= id <= length(ID)
@@ -165,7 +165,7 @@ function Base.in(id::Int, sdict::IndexedStructVector)
     return id in keys(id_to_index)
 end
 
-function Base.delete!(sdict::IndexedStructVector, a::IndexedStruct)
+function Base.delete!(sdict::IndexedStructVector, a::IndexedView)
     comps, id_to_index = getfield(sdict, :components), getfield(sdict, :id_to_index)
     del, ID = getfield(sdict, :del), getfield(comps, :ID)
     id, lasti = getfield(a, :id), getfield(a, :lasti)
