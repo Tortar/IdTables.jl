@@ -114,17 +114,20 @@ Base.getproperty(isv::SlotMapStructVector, name::Symbol) = getfield(isv, :compon
 
 lastkey(isv::SlotMapStructVector) = getfield(isv, :last_id)
 
-function Base.deleteat!(isv::SlotMapStructVector, i::Int)
-    comps = getfield(isv, :components)
-    ID = getfield(comps, :ID)
-    pid = ID[i]
-    Base.delete!(isv, pid)
-end
-
-function Base.delete!(isv::SlotMapStructVector, id::Int64)
+@inline function id_guess_to_index(isv::SlotMapStructVector, id::Int64, lasti::Int)::Int
     if id ∉ isv
         throw(KeyError(id))
     end
+    slots = getfield(isv, :slots)
+    slots_len = getfield(isv, :slots_len)
+    if iszero(slots_len)
+        id%Int
+    else
+        (slots[id & val_mask(isv)] & val_mask(isv))%Int
+    end
+end
+
+function delete_id_index!(isv::SlotMapStructVector, id::Int64, i::Int)
     comps, slots = getfield(isv, :components), getfield(isv, :slots)
     slots_len, ID = getfield(isv, :slots_len), getfield(comps, :ID)
     startlen = length(ID)
@@ -138,7 +141,6 @@ function Base.delete!(isv::SlotMapStructVector, id::Int64)
         setfield!(isv, :slots_len, startlen)
     end
     old_slot = slots[slot_idx]
-    i = Int(old_slot & val_mask(isv))
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
     # Update free linked list
@@ -146,7 +148,7 @@ function Base.delete!(isv::SlotMapStructVector, id::Int64)
     # Free head is zero if the free list is empty
     if old_slot < gen_mask(isv)
         # The slot has not been used too many times to cause a generation overflow.
-        slots[slot_idx] = UInt64(1)<<63 | old_slot & ~val_mask(isv) | UInt64(free_head)
+        slots[slot_idx] = UInt64(1)<<63 | old_slot & ~val_mask(isv) | free_head%UInt64
         setfield!(isv, :free_head, slot_idx)
     else
         # Avoid adding the slot back to the free list if it has been used too many times
@@ -159,6 +161,23 @@ function Base.delete!(isv::SlotMapStructVector, id::Int64)
         slots[moved_slot_idx] = slots[moved_slot_idx] & ~val_mask(isv) | i
     end
     return isv
+end
+
+function Base.deleteat!(isv::SlotMapStructVector, i::Int)
+    comps = getfield(isv, :components)
+    ID = getfield(comps, :ID)
+    delete_id_index!(isv, ID[i], i)
+end
+
+function Base.delete!(isv::SlotMapStructVector, id::Int)
+    i = id_guess_to_index(isv, id, id)
+    delete_id_index!(isv, id, i)
+end
+
+function Base.delete!(isv::SlotMapStructVector, a::IndexedView)
+    id, lasti = getfield(a, :id), getfield(a, :lasti)
+    i = id_guess_to_index(isv, id, lasti)
+    delete_id_index!(isv, id, i)
 end
 
 function Base.push!(isv::SlotMapStructVector, t::NamedTuple)
@@ -229,21 +248,8 @@ function Base.keys(isv::SlotMapStructVector)
     return Keys(getfield(getfield(isv, :components), :ID))
 end
 
-@inline function id_to_index(isv::SlotMapStructVector, id::Int64, lasti::Int)::Int
-    if id ∉ isv
-        throw(KeyError(id))
-    end
-    slots = getfield(isv, :slots)
-    slots_len = getfield(isv, :slots_len)
-    if iszero(slots_len)
-        id%Int
-    else
-        (slots[id & val_mask(isv)] & val_mask(isv))%Int
-    end
-end
-
 @inline function Base.getindex(isv::SlotMapStructVector, id::Int64)
-    return IndexedView(id, id_to_index(isv, id, id), isv)
+    return IndexedView(id, id_guess_to_index(isv, id, id), isv)
 end
 
 function Base.in(a::IndexedView, isv::SlotMapStructVector)
@@ -267,10 +273,6 @@ function Base.in(id::Int64, isv::SlotMapStructVector)
         return false
     end
     true
-end
-
-function Base.delete!(isv::SlotMapStructVector, a::IndexedView)
-    Base.delete!(isv, getfield(a, :id))
 end
 
 # Copied from base/array.jl because this is not a public function
