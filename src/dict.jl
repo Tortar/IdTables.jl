@@ -1,42 +1,62 @@
 mutable struct IndexedStructVector{C}
-	del::Bool
+    del::Bool
     nextlastid::Int64
-	const id_to_index::Dict{Int64, Int}
-	const components::C
-	function IndexedStructVector(components::NamedTuple)
-		allequal(length.(values(components))) || error("All components must have equal length")
-		len = length(first(components))
-		comps = merge((ID=collect(1:len),), components)
-		return new{typeof(comps)}(false, len, Dict{Int64,Int}(), comps)
-	end
+    const id_to_index::Dict{Int64, Int}
+    const components::C
+    function IndexedStructVector(components::NamedTuple)
+        allequal(length.(values(components))) || error("All components must have equal length")
+        len = length(first(components))
+        comps = merge((ID=collect(1:len),), components)
+        return new{typeof(comps)}(false, len, Dict{Int64,Int}(), comps)
+    end
 end
 
 Base.getproperty(isv::IndexedStructVector, name::Symbol) = getfield(isv, :components)[name]
 
 lastkey(isv::IndexedStructVector) = getfield(isv, :nextlastid)
 
-function Base.deleteat!(isv::IndexedStructVector, i::Int)
-    comps, id_to_index = getfield(isv, :components), getfield(isv, :id_to_index)
-    del, ID = getfield(isv, :del), getfield(comps, :ID)
-    pid = ID[i]
-    !del && setfield!(isv, :del, true)
-    removei! = a -> remove!(a, i)
-    unrolled_map(removei!, values(comps))
-    delete!(id_to_index, pid)
-    i <= length(ID) && (id_to_index[(@inbounds ID[i])] = i)
-    return isv
+@inline function id_guess_to_index(isv::IndexedStructVector, id::Int64, lasti::Int)::Int
+    del = getfield(isv, :del)
+    comps = getfield(isv, :components)
+    ID = getfield(comps, :ID)
+    if !del
+        checkbounds(Bool, ID, id) || throw(KeyError(id))
+        id
+    else
+        if lasti ∈ eachindex(ID) && (@inbounds ID[lasti] == id)
+            lasti
+        else
+            getfield(isv, :id_to_index)[id]
+        end
+    end
 end
 
-function Base.delete!(isv::IndexedStructVector, id::Int)
+@inline function delete_id_index!(isv::IndexedStructVector, id::Int64, i::Int)
     comps, id_to_index = getfield(isv, :components), getfield(isv, :id_to_index)
-	del, ID = getfield(isv, :del), getfield(comps, :ID)
+    del, ID = getfield(isv, :del), getfield(comps, :ID)
     !del && setfield!(isv, :del, true)
-    i = (1 <= id <= length(ID) && (@inbounds ID[id] == id)) ? id : id_to_index[id]
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
     delete!(id_to_index, id)
     i <= length(ID) && (id_to_index[(@inbounds ID[i])] = i)
     return isv
+end
+
+function Base.deleteat!(isv::IndexedStructVector, i::Int)
+    comps = getfield(isv, :components)
+    ID = getfield(comps, :ID)
+    delete_id_index!(isv, ID[i], i)
+end
+
+function Base.delete!(isv::IndexedStructVector, id::Int)
+    i = id_guess_to_index(isv, id, id)
+    delete_id_index!(isv, id, i)
+end
+
+function Base.delete!(isv::IndexedStructVector, a::IndexedView)
+    id, lasti = getfield(a, :id), getfield(a, :lasti)
+    i = id_guess_to_index(isv, id, lasti)
+    delete_id_index!(isv, id, i)
 end
 
 function Base.push!(isv::IndexedStructVector, t::NamedTuple)
@@ -61,22 +81,8 @@ function Base.keys(isv::IndexedStructVector)
     return Keys(getfield(getfield(isv, :components), :ID))
 end
 
-@inline function id_to_index(isv::IndexedStructVector, id::Int64, lasti::Int)::Int
-    del = getfield(isv, :del)
-    comps = getfield(isv, :components)
-    ID = getfield(comps, :ID)
-    if !del
-        checkbounds(ID, id)
-        return id
-    else
-        lasti <= length(ID) && (@inbounds ID[lasti] == id) && return lasti
-        id_to_index = getfield(isv, :id_to_index)
-        return id_to_index[id]
-    end
-end
-
 @inline function Base.getindex(isv::IndexedStructVector, id::Int)
-    return IndexedView(id, id_to_index(isv, id, id), isv)
+    return IndexedView(id, id_guess_to_index(isv, id, id), isv)
 end
 
 function Base.in(a::IndexedView, isv::IndexedStructVector)
@@ -94,17 +100,4 @@ function Base.in(id::Int64, isv::IndexedStructVector)
     !del && return 1 <= id <= length(ID)
     id_to_index = getfield(isv, :id_to_index)
     return id in keys(id_to_index)
-end
-
-function Base.delete!(isv::IndexedStructVector, a::IndexedView)
-    comps, id_to_index = getfield(isv, :components), getfield(isv, :id_to_index)
-    del, ID = getfield(isv, :del), getfield(comps, :ID)
-    id, lasti = getfield(a, :id), getfield(a, :lasti)
-    !del && setfield!(isv, :del, true)
-    i = lasti <= length(ID) && (@inbounds ID[lasti] == id) ? lasti : id_to_index[id]
-    removei! = a -> remove!(a, i)
-    unrolled_map(removei!, values(comps))
-    delete!(id_to_index, id)
-    i <= length(ID) && (id_to_index[(@inbounds ID[i])] = i)
-    return isv
 end
