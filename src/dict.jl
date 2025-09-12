@@ -98,6 +98,7 @@ function Base.in(id::Int64, isv::IndexedStructVector)
     comps = getfield(isv, :components)
     del, ID = getfield(isv, :del), getfield(comps, :ID)
     !del && return 1 <= id <= length(ID)
+    id ∈ eachindex(ID) && (@inbounds ID[id] == id) && return true
     id_to_index = getfield(isv, :id_to_index)
     return id in keys(id_to_index)
 end
