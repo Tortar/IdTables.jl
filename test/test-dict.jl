@@ -37,6 +37,7 @@ using Test
         ids_after = collect(keys(s))
         @test length(ids_after) == 3
         @test (2 in ids_after) == false
+        @test 1 ∈ ids_after
 
         push!(s, (num = 111, tag = 'z'))
         new_id = IndexedStructVectors.lastkey(s)
