@@ -42,6 +42,7 @@ using Test
         ids_after = collect(keys(s))
         @test length(ids_after) == 3
         @test (2 in ids_after) == false
+        @test 1 ∈ ids_after
 
         push!(s, (num = 111, tag = 'z'))
         assert_invariants(s)
@@ -91,11 +92,11 @@ using Test
     end
 
     @testset "test logic for dead slots" begin
-        # if val_nbits=2 capacity is limited to 3 elements
-        @test_throws ErrorException SlotMapStructVector((;num = [10,20,30,40]); val_nbits=2)
-        s = SlotMapStructVector((;num = [10,20,30]); val_nbits=2)
+        # if NBITS=2 capacity is limited to 3 elements
+        @test_throws ErrorException SlotMapStructVector{2}((;num = [10,20,30,40]))
+        s = SlotMapStructVector{2}((;num = [10,20,30]))
         @test_throws ErrorException push!(s, (; num=10))
-        s = SlotMapStructVector((;num = [10,20,30]); val_nbits=2)
+        s = SlotMapStructVector{2}((;num = [10,20,30]))
         deleteat!(s, 3)
         assert_invariants(s)
         push!(s, (; num=10))
@@ -111,7 +112,7 @@ using Test
         setfield!(s, :free_head, 0)
         @test_throws ErrorException push!(s, (; num=10))
 
-        s = SlotMapStructVector((;num = [10,20,30,40]); val_nbits=61)
+        s = SlotMapStructVector{61}((;num = [10,20,30,40]))
         # As the last id is deleted and pushed repeatedly, it should get the following
         # ids.
         expected_last_ids = [
@@ -134,7 +135,7 @@ using Test
             assert_invariants(s)
         end
 
-        s = SlotMapStructVector((;num = [10,20,30,40]); val_nbits=61)
+        s = SlotMapStructVector{61}((;num = [10,20,30,40]))
         delete!(s, Int64(1))
         # As the first id is deleted and pushed repeatedly, it should get the following
         # ids.

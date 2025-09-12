@@ -2,7 +2,7 @@
 
 const EMPTY_SLOTS = Memory{UInt64}(undef, 0)
 
-mutable struct SlotMapStructVector{C, VAL_MASK}
+mutable struct SlotMapStructVector{NBITS, C}
     # This stores the generation and index into components, 
     # or the next free slot if vacant.
     # The MSb of the slot is one if vacant and zero if occupied
@@ -15,21 +15,23 @@ mutable struct SlotMapStructVector{C, VAL_MASK}
     free_head::Int
     last_id::Int64
     const components::C
-    function SlotMapStructVector(components::NamedTuple; val_nbits::Integer=32)
-        allequal(length.(values(components))) || error("All components must have equal length")
-        len = length(first(components))
-        _val_mask::UInt64 = (UInt64(1) << val_nbits) - 1
-        if len > _val_mask
-            error("SlotMapStructVector can store at most $(_val_mask) elements but got $(len) elements.")
-        end
-        # Start with generation 0
-        comps = merge((ID=collect(Int64(1):Int64(len)),), components)
-        return new{typeof(comps), _val_mask}(EMPTY_SLOTS, Int64(0), Int64(0), Int64(len), comps)
-    end
 end
 
-function val_mask(isv::SlotMapStructVector{C, VAL_MASK}) where {C, VAL_MASK}
-    VAL_MASK
+function SlotMapStructVector{NBITS}(components::NamedTuple) where {NBITS}
+    allequal(length.(values(components))) || error("All components must have equal length")
+    len = length(first(components))
+    val_mask = (UInt64(1) << NBITS) - 1
+    if len > val_mask
+        error("SlotMapStructVector can store at most $(val_mask) elements but got $(len) elements.")
+    end
+    # Start with generation 0
+    comps = merge((ID=collect(Int64(1):Int64(len)),), components)
+    SlotMapStructVector{NBITS, typeof(comps)}(EMPTY_SLOTS, Int64(0), Int64(0), Int64(len), comps)
+end
+SlotMapStructVector(components::NamedTuple) = SlotMapStructVector{32}(components)
+
+function val_mask(isv::SlotMapStructVector{NBITS}) where {NBITS}
+    (UInt64(1) << NBITS) - 1
 end
 
 function gen_mask(isv::SlotMapStructVector)
@@ -131,7 +133,7 @@ function delete_id_index!(isv::SlotMapStructVector, id::Int64, i::Int)
     comps, slots = getfield(isv, :components), getfield(isv, :slots)
     slots_len, ID = getfield(isv, :slots_len), getfield(comps, :ID)
     startlen = length(ID)
-    slot_idx = Int(id & val_mask(isv))
+    slot_idx = (id & val_mask(isv))%Int
     if iszero(slots_len)
         # Slots have not been allocated yet
         slots = Memory{UInt64}(undef, startlen)
@@ -140,7 +142,7 @@ function delete_id_index!(isv::SlotMapStructVector, id::Int64, i::Int)
         setfield!(isv, :slots, slots)
         setfield!(isv, :slots_len, startlen)
     end
-    old_slot = slots[slot_idx]
+    @inbounds old_slot = slots[slot_idx]
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
     # Update free linked list
@@ -148,17 +150,17 @@ function delete_id_index!(isv::SlotMapStructVector, id::Int64, i::Int)
     # Free head is zero if the free list is empty
     if old_slot < gen_mask(isv)
         # The slot has not been used too many times to cause a generation overflow.
-        slots[slot_idx] = UInt64(1)<<63 | old_slot & ~val_mask(isv) | free_head%UInt64
+        @inbounds slots[slot_idx] = UInt64(1)<<63 | old_slot & ~val_mask(isv) | free_head%UInt64
         setfield!(isv, :free_head, slot_idx)
     else
         # Avoid adding the slot back to the free list if it has been used too many times
-        slots[slot_idx] = ~UInt64(0)
+        @inbounds slots[slot_idx] = ~UInt64(0)
     end
     if i ≤ length(ID)
         # adjust values in slots because the components have swapped
-        moved_pid = ID[i]
-        moved_slot_idx = moved_pid & val_mask(isv)
-        slots[moved_slot_idx] = slots[moved_slot_idx] & ~val_mask(isv) | i
+        @inbounds moved_pid = ID[i]
+        moved_slot_idx = (moved_pid & val_mask(isv))%Int
+        @inbounds slots[moved_slot_idx] = slots[moved_slot_idx] & ~val_mask(isv) | i
     end
     return isv
 end
@@ -183,7 +185,7 @@ end
 function Base.push!(isv::SlotMapStructVector, t::NamedTuple)
     comps, slots = getfield(isv, :components), getfield(isv, :slots)
     slots_len, free_head = getfield(isv, :slots_len), getfield(isv, :free_head)
-    fieldnames(typeof(comps))[2:end] != keys(t) && error("Tuple fields do not match container fields")
+    fieldnames(typeof(comps))[2:end] !== keys(t) && error("Tuple fields do not match container fields")
     ID = getfield(comps, :ID)
     startlen = Int64(length(ID))
     if startlen ≥ val_mask(isv)
@@ -220,15 +222,14 @@ function Base.push!(isv::SlotMapStructVector, t::NamedTuple)
             slots[new_id] = (startlen + 1)%UInt64
         else
             # Pick a slot off the free list
-            @assert free_head ∈ 1:slots_len
-            free_slot = slots[free_head]
-            next_free_head = Int(free_slot & val_mask(isv))
+            @inbounds free_slot = slots[free_head]
+            next_free_head = (free_slot & val_mask(isv))%Int
             old_gen = free_slot & gen_mask(isv)
             next_gen = old_gen + (val_mask(isv) + 1)
             new_slot = next_gen | UInt64(startlen + 1)
             new_id = (next_gen | free_head%UInt64)%Int64
             setfield!(isv, :free_head, next_free_head)
-            slots[free_head] = new_slot
+            @inbounds slots[free_head] = new_slot
             push!(ID, new_id)
             setfield!(isv, :last_id, new_id)
         end
@@ -237,7 +238,7 @@ function Base.push!(isv::SlotMapStructVector, t::NamedTuple)
     return isv
 end
 
-function Base.show(io::IO, ::MIME"text/plain", x::SlotMapStructVector{C}) where C
+function Base.show(io::IO, ::MIME"text/plain", x::SlotMapStructVector{N, C}) where {N, C}
     comps = getfield(x, :components)
     sC = string(C)[13:end]
     print("SlotMapStructVector{$sC")
@@ -255,7 +256,7 @@ end
 function Base.in(a::IndexedView, isv::SlotMapStructVector)
     getfield(a, :id) ∈ isv
 end
-function Base.in(id::Int64, isv::SlotMapStructVector)
+function Base.in(id::Int64, isv::SlotMapStructVector)::Bool
     comps = getfield(isv, :components)
     slots_len, ID = getfield(isv, :slots_len), getfield(comps, :ID)
     iszero(slots_len) && return id ∈ eachindex(ID)
@@ -268,7 +269,7 @@ function Base.in(id::Int64, isv::SlotMapStructVector)
     if slot_idx ∉ 1:slots_len
         return false
     end
-    slot = slots[slot_idx]
+    @inbounds slot = slots[slot_idx]
     if slot & ~val_mask(isv) !== id & ~val_mask(isv)
         return false
     end
