@@ -1,5 +1,8 @@
 #!/usr/bin/env -S OPENBLAS_NUM_THREADS=1 JULIA_LOAD_PATH=@ julia --project=@script --threads=1 --startup-file=no
 
+# This script plots benchmark results to a `benchmark.png` file
+# in the working directory
+
 using Chairmarks
 using IndexedStructVectors
 using Random

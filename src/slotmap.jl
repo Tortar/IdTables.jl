@@ -1,5 +1,7 @@
 # Loosely based on data structures from https://github.com/orlp/slotmap
 
+isdefined(@__MODULE__, :Memory) || const Memory = Vector # Compat for Julia < 1.11
+
 const EMPTY_SLOTS = Memory{UInt64}(undef, 0)
 
 # This is an alternative to IndexedStructVectors
