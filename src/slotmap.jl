@@ -143,24 +143,24 @@ function Base.push!(isv::SlotMapStructVector, t::NamedTuple)
                     old_slots_capacity+1,
                     val_mask(isv)
                 )
-                new_slots = typeof(slots)(undef, Int(new_slots_capacity))
+                new_slots = Memory{UInt64}(undef, Int(new_slots_capacity))
                 copyto!(new_slots, slots)
                 setfield!(isv, :slots, new_slots)
                 slots = new_slots
             end
             # Start with generation 0
             setfield!(isv, :slots_len, slots_len + 1)
-            new_id = Int64(slots_len) + 1
+            new_id = (slots_len + 1)%Int64
             push!(ID, new_id)
             setfield!(isv, :last_id, new_id)
-            slots[new_id] = (startlen + 1)%UInt64
+            @inbounds slots[new_id] = (startlen + 1)%UInt64
         else
             # Pick a slot off the free list
             @inbounds free_slot = slots[free_head]
             next_free_head = (free_slot & val_mask(isv))%Int
             old_gen = free_slot & gen_mask(isv)
             next_gen = old_gen + (val_mask(isv) + 1)
-            new_slot = next_gen | UInt64(startlen + 1)
+            new_slot = next_gen | (startlen + 1)%UInt64
             new_id = (next_gen | free_head%UInt64)%Int64
             setfield!(isv, :free_head, next_free_head)
             @inbounds slots[free_head] = new_slot
