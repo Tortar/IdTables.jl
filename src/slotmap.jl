@@ -59,7 +59,7 @@ lastkey(isv::SlotMapStructVector) = getfield(isv, :last_id)
     if iszero(slots_len)
         id%Int
     else
-        (slots[id & val_mask(isv)] & val_mask(isv))%Int
+        @inbounds slotidx(slots[slotidx(id, isv)], isv)
     end
 end
 
@@ -67,7 +67,7 @@ function delete_id_index!(isv::SlotMapStructVector, id::Int64, i::Int)
     comps, slots = getfield(isv, :components), getfield(isv, :slots)
     slots_len, ID = getfield(isv, :slots_len), getfield(comps, :ID)
     startlen = length(ID)
-    slot_idx = (id & val_mask(isv))%Int
+    slot_idx = slotidx(id, isv)
     if iszero(slots_len)
         # Slots have not been allocated yet
         slots = Memory{UInt64}(undef, startlen)
@@ -93,7 +93,7 @@ function delete_id_index!(isv::SlotMapStructVector, id::Int64, i::Int)
     if i ≤ length(ID)
         # adjust values in slots because the components have swapped
         @inbounds moved_pid = ID[i]
-        moved_slot_idx = (moved_pid & val_mask(isv))%Int
+        moved_slot_idx = slotidx(moved_pid, isv)
         @inbounds slots[moved_slot_idx] = slots[moved_slot_idx] & ~val_mask(isv) | i
     end
     return isv
@@ -157,7 +157,7 @@ function Base.push!(isv::SlotMapStructVector, t::NamedTuple)
         else
             # Pick a slot off the free list
             @inbounds free_slot = slots[free_head]
-            next_free_head = (free_slot & val_mask(isv))%Int
+            next_free_head = slotidx(free_slot, isv)
             old_gen = free_slot & gen_mask(isv)
             next_gen = old_gen + (val_mask(isv) + 1)
             new_slot = next_gen | (startlen + 1)%UInt64
@@ -187,6 +187,10 @@ end
     return IndexedView(id, id_guess_to_index(isv, id, id), isv)
 end
 
+function slotidx(id, isv)
+    (id & val_mask(isv))%Int
+end
+
 function Base.in(a::IndexedView, isv::SlotMapStructVector)
     getfield(a, :id) ∈ isv
 end
@@ -199,7 +203,7 @@ function Base.in(id::Int64, isv::SlotMapStructVector)::Bool
     end
     slots = getfield(isv, :slots)
     slots_len = getfield(isv, :slots_len)
-    slot_idx = id & val_mask(isv)
+    slot_idx = slotidx(id, isv)
     if slot_idx ∉ 1:slots_len
         return false
     end
