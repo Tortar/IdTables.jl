@@ -80,10 +80,10 @@ function delete_id_index!(isv::SlotMapStructVector, id::Int64, i::Int)
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
     # Update free linked list
-    free_head = getfield(isv, :free_head)
     # Free head is zero if the free list is empty
     if old_slot < gen_mask(isv)
         # The slot has not been used too many times to cause a generation overflow.
+        free_head = getfield(isv, :free_head)
         @inbounds slots[slot_idx] = UInt64(1)<<63 | old_slot & gen_mask(isv) | free_head%UInt64
         setfield!(isv, :free_head, slot_idx)
     else
@@ -128,45 +128,43 @@ function Base.push!(isv::SlotMapStructVector, t::NamedTuple)
     if iszero(slots_len)
         push!(ID, startlen + 1)
         setfield!(isv, :last_id, startlen + 1)
-    else
-        if iszero(free_head)
-            # push a slot to the end of slots
-            old_slots_capacity = length(slots)
-            if old_slots_capacity == slots_len
-                if old_slots_capacity ≥ val_mask(isv)
-                    error("SlotMapStructVector is out of capacity")
-                end
-                # reallocate the slots
-                # avoid having a capacity larger than val_mask(isv)
-                new_slots_capacity = clamp(
-                    overallocation(old_slots_capacity),
-                    old_slots_capacity+1,
-                    val_mask(isv)
-                )
-                new_slots = Memory{UInt64}(undef, Int(new_slots_capacity))
-                unsafe_copyto!(new_slots, 1, slots, 1, length(slots))
-                setfield!(isv, :slots, new_slots)
-                slots = new_slots
+    elseif iszero(free_head)
+        # push a slot to the end of slots
+        old_slots_capacity = length(slots)
+        if old_slots_capacity == slots_len
+            if old_slots_capacity ≥ val_mask(isv)
+                error("SlotMapStructVector is out of capacity")
             end
-            # Start with generation 0
-            setfield!(isv, :slots_len, slots_len + 1)
-            new_id = (slots_len + 1)%Int64
-            push!(ID, new_id)
-            setfield!(isv, :last_id, new_id)
-            @inbounds slots[new_id] = (startlen + 1)%UInt64
-        else
-            # Pick a slot off the free list
-            @inbounds free_slot = slots[free_head]
-            next_free_head = slotidx(free_slot, isv)
-            old_gen = free_slot & gen_mask(isv)
-            next_gen = old_gen + (val_mask(isv) + 1)
-            new_slot = next_gen | (startlen + 1)%UInt64
-            new_id = (next_gen | free_head%UInt64)%Int64
-            setfield!(isv, :free_head, next_free_head)
-            @inbounds slots[free_head] = new_slot
-            push!(ID, new_id)
-            setfield!(isv, :last_id, new_id)
+            # reallocate the slots
+            # avoid having a capacity larger than val_mask(isv)
+            new_slots_capacity = clamp(
+                overallocation(old_slots_capacity),
+                old_slots_capacity+1,
+                val_mask(isv)
+            )
+            new_slots = Memory{UInt64}(undef, Int(new_slots_capacity))
+            unsafe_copyto!(new_slots, 1, slots, 1, length(slots))
+            setfield!(isv, :slots, new_slots)
+            slots = new_slots
         end
+        # Start with generation 0
+        setfield!(isv, :slots_len, slots_len + 1)
+        new_id = (slots_len + 1)%Int64
+        push!(ID, new_id)
+        setfield!(isv, :last_id, new_id)
+        @inbounds slots[new_id] = (startlen + 1)%UInt64
+    else
+        # Pick a slot off the free list
+        @inbounds free_slot = slots[free_head]
+        next_free_head = slotidx(free_slot, isv)
+        old_gen = free_slot & gen_mask(isv)
+        next_gen = old_gen + (val_mask(isv) + 1)
+        new_slot = next_gen | (startlen + 1)%UInt64
+        new_id = (next_gen | free_head%UInt64)%Int64
+        setfield!(isv, :free_head, next_free_head)
+        @inbounds slots[free_head] = new_slot
+        push!(ID, new_id)
+        setfield!(isv, :last_id, new_id)
     end
     unrolled_map(push!, values(comps)[2:end], t)
     return isv
