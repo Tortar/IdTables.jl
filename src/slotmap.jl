@@ -4,8 +4,6 @@ isdefined(@__MODULE__, :Memory) || const Memory = Vector # Compat for Julia < 1.
 
 const EMPTY_SLOTS = Memory{UInt64}(undef, 0)
 
-# This is an alternative to IndexedStructVectors
-# It is consistently faster but has some downsides.
 # There are a max of 2^NBITS-1 active elements allowed at a time
 # by default NBITS=32 so around 4 billion.
 # Deleting and pushing elements slowly leaks memory
