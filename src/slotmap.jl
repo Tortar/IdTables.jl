@@ -1,0 +1,232 @@
+# Loosely based on data structures from https://github.com/orlp/slotmap
+
+isdefined(@__MODULE__, :Memory) || const Memory = Vector # Compat for Julia < 1.11
+
+const EMPTY_SLOTS = Memory{UInt64}(undef, 0)
+
+# This is an alternative to IndexedStructVectors
+# It is consistently faster but has some downsides.
+# There are a max of 2^NBITS-1 active elements allowed at a time
+# by default NBITS=32 so around 4 billion.
+# Deleting and pushing elements slowly leaks memory
+# at a rate of 8 bytes per 2^(63-NBITS) pairs of delete and push.
+mutable struct SlotMapStructVector{NBITS, C}
+    # This stores the generation and index into components, 
+    # or the next free slot if vacant.
+    # The MSb of the slot is one if vacant and zero if occupied
+    slots::Memory{UInt64}
+    # Used length of slots.
+    # This is zero before any element is deleted
+    slots_len::Int
+    # Top of the free linked list stored in vacant slots
+    # This is zero if there are no free slots
+    free_head::Int
+    last_id::Int64
+    const components::C
+end
+
+function SlotMapStructVector{NBITS}(components::NamedTuple) where {NBITS}
+    allequal(length.(values(components))) || error("All components must have equal length")
+    len = length(first(components))
+    val_mask = (UInt64(1) << NBITS) - 1
+    if len > val_mask
+        error(lazy"SlotMapStructVector can store at most $(val_mask) elements but got $(len) elements.")
+    end
+    # Start with generation 0
+    comps = merge((ID=collect(Int64(1):Int64(len)),), components)
+    SlotMapStructVector{NBITS, typeof(comps)}(EMPTY_SLOTS, Int64(0), Int64(0), Int64(len), comps)
+end
+SlotMapStructVector(components::NamedTuple) = SlotMapStructVector{32}(components)
+
+function val_mask(isv::SlotMapStructVector{NBITS}) where {NBITS}
+    (UInt64(1) << NBITS) - 1
+end
+
+function gen_mask(isv::SlotMapStructVector)
+    ~(UInt64(1) << 63) & ~val_mask(isv)
+end
+
+Base.getproperty(isv::SlotMapStructVector, name::Symbol) = getfield(isv, :components)[name]
+
+lastkey(isv::SlotMapStructVector) = getfield(isv, :last_id)
+
+@inline function id_guess_to_index(isv::SlotMapStructVector, id::Int64, lasti::Int)
+    if id ∉ isv
+        throw(KeyError(id))
+    end
+    slots_len = getfield(isv, :slots_len)
+    if iszero(slots_len)
+        id%Int
+    else
+        slots = getfield(isv, :slots)
+        @inbounds slotidx(slots[slotidx(id, isv)], isv)
+    end
+end
+
+function delete_id_index!(isv::SlotMapStructVector, id::Int64, i::Int)
+    comps, slots = getfield(isv, :components), getfield(isv, :slots)
+    slots_len, ID = getfield(isv, :slots_len), getfield(comps, :ID)
+    startlen = length(ID)
+    slot_idx = slotidx(id, isv)
+    if iszero(slots_len)
+        # Slots have not been allocated yet
+        slots = Memory{UInt64}(undef, startlen)
+        # Start with generation 0
+        slots .= UInt64(1):UInt64(startlen)
+        setfield!(isv, :slots, slots)
+        setfield!(isv, :slots_len, startlen)
+    end
+    @inbounds old_slot = slots[slot_idx]
+    removei! = a -> remove!(a, i)
+    unrolled_map(removei!, values(comps))
+    # Update free linked list
+    # Free head is zero if the free list is empty
+    if old_slot < gen_mask(isv)
+        # The slot has not been used too many times to cause a generation overflow.
+        free_head = getfield(isv, :free_head)
+        @inbounds slots[slot_idx] = UInt64(1)<<63 | old_slot & gen_mask(isv) | free_head%UInt64
+        setfield!(isv, :free_head, slot_idx)
+    else
+        # Avoid adding the slot back to the free list if it has been used too many times
+        @inbounds slots[slot_idx] = typemax(UInt64)
+    end
+    if i < startlen
+        # adjust values in slots because the components have swapped
+        @inbounds moved_pid = ID[i]
+        moved_slot_idx = slotidx(moved_pid, isv)
+        @inbounds slots[moved_slot_idx] = slots[moved_slot_idx] & ~val_mask(isv) | i
+    end
+    return isv
+end
+
+function Base.deleteat!(isv::SlotMapStructVector, i::Int)
+    comps = getfield(isv, :components)
+    ID = getfield(comps, :ID)
+    delete_id_index!(isv, ID[i], i)
+end
+
+function Base.delete!(isv::SlotMapStructVector, id::Int)
+    i = id_guess_to_index(isv, id, id)
+    delete_id_index!(isv, id, i)
+end
+
+function Base.delete!(isv::SlotMapStructVector, a::IndexedView)
+    id, lasti = getfield(a, :id), getfield(a, :lasti)
+    i = id_guess_to_index(isv, id, lasti)
+    delete_id_index!(isv, id, i)
+end
+
+function Base.push!(isv::SlotMapStructVector, t::NamedTuple)
+    comps, slots = getfield(isv, :components), getfield(isv, :slots)
+    slots_len, free_head = getfield(isv, :slots_len), getfield(isv, :free_head)
+    fieldnames(typeof(comps))[2:end] !== keys(t) && error("Tuple fields do not match container fields")
+    ID = getfield(comps, :ID)
+    startlen = length(ID)%Int64
+    if startlen ≥ val_mask(isv)
+        error(lazy"SlotMapStructVector can store at most $(val_mask(isv)) elements.")
+    end
+    if iszero(slots_len)
+        push!(ID, startlen + 1)
+        setfield!(isv, :last_id, startlen + 1)
+    elseif iszero(free_head)
+        # push a slot to the end of slots
+        old_slots_capacity = length(slots)
+        if old_slots_capacity == slots_len
+            if old_slots_capacity ≥ val_mask(isv)
+                error("SlotMapStructVector is out of capacity")
+            end
+            # reallocate the slots
+            # avoid having a capacity larger than val_mask(isv)
+            new_slots_capacity = clamp(
+                overallocation(old_slots_capacity),
+                old_slots_capacity+1,
+                val_mask(isv)
+            )
+            new_slots = Memory{UInt64}(undef, Int(new_slots_capacity))
+            unsafe_copyto!(new_slots, 1, slots, 1, length(slots))
+            setfield!(isv, :slots, new_slots)
+            slots = new_slots
+        end
+        # Start with generation 0
+        setfield!(isv, :slots_len, slots_len + 1)
+        new_id = (slots_len + 1)%Int64
+        push!(ID, new_id)
+        setfield!(isv, :last_id, new_id)
+        @inbounds slots[new_id] = (startlen + 1)%UInt64
+    else
+        # Pick a slot off the free list
+        @inbounds free_slot = slots[free_head]
+        next_free_head = slotidx(free_slot, isv)
+        old_gen = free_slot & gen_mask(isv)
+        next_gen = old_gen + (val_mask(isv) + 1)
+        new_slot = next_gen | (startlen + 1)%UInt64
+        new_id = (next_gen | free_head%UInt64)%Int64
+        setfield!(isv, :free_head, next_free_head)
+        @inbounds slots[free_head] = new_slot
+        push!(ID, new_id)
+        setfield!(isv, :last_id, new_id)
+    end
+    unrolled_map(push!, values(comps)[2:end], t)
+    return isv
+end
+
+function Base.show(io::IO, ::MIME"text/plain", x::SlotMapStructVector{N, C}) where {N, C}
+    comps = getfield(x, :components)
+    sC = string(C)[13:end]
+    print("SlotMapStructVector{$sC")
+    return display(comps)
+end
+
+function Base.keys(isv::SlotMapStructVector)
+    return Keys(getfield(getfield(isv, :components), :ID))
+end
+
+@inline function Base.getindex(isv::SlotMapStructVector, id::Int64)
+    return IndexedView(id, id_guess_to_index(isv, id, id), isv)
+end
+
+function slotidx(id, isv)
+    (id & val_mask(isv))%Int
+end
+
+function Base.in(a::IndexedView, isv::SlotMapStructVector)
+    getfield(a, :id) ∈ isv
+end
+function Base.in(id::Int64, isv::SlotMapStructVector)
+    comps = getfield(isv, :components)
+    slots_len, ID = getfield(isv, :slots_len), getfield(comps, :ID)
+    iszero(slots_len) && return id ∈ eachindex(ID)
+    if signbit(id)
+        return false
+    end
+    slots_len = getfield(isv, :slots_len)
+    slot_idx = slotidx(id, isv)
+    if slot_idx ∉ 1:slots_len
+        return false
+    end
+    slots = getfield(isv, :slots)
+    @inbounds slot = slots[slot_idx]
+    if slot & ~val_mask(isv) != id & ~val_mask(isv)
+        return false
+    end
+    true
+end
+
+# Copied from base/array.jl because this is not a public function
+# https://github.com/JuliaLang/julia/blob/v1.11.6/base/array.jl#L1042-L1056
+
+# Pick new memory size for efficiently growing an array
+# TODO: This should know about the size of our GC pools
+# Specifically we are wasting ~10% of memory for small arrays
+# by not picking memory sizes that max out a GC pool
+function overallocation(maxsize)
+    maxsize < 8 && return 8;
+    # compute maxsize = maxsize + 4*maxsize^(7/8) + maxsize/8
+    # for small n, we grow faster than O(n)
+    # for large n, we grow at O(n/8)
+    # and as we reach O(memory) for memory>>1MB,
+    # this means we end by adding about 10% of memory each time
+    exp2 = sizeof(maxsize) * 8 - Core.Intrinsics.ctlz_int(maxsize)
+    maxsize += (1 << div(exp2 * 7, 8)) * 4 + div(maxsize, 8)
+    return maxsize
+end
