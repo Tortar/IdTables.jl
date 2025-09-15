@@ -8,7 +8,7 @@ const EMPTY_SLOTS = Memory{UInt64}(undef, 0)
 # by default NBITS=32 so around 4 billion.
 # Deleting and pushing elements slowly leaks memory
 # at a rate of 8 bytes per 2^(63-NBITS) pairs of delete and push.
-mutable struct SlotMapStructVector{NBITS, C} 
+mutable struct SlotMapStructVector{NBITS, C}
     # This stores the generation and index into components, 
     # or the next free slot if vacant.
     # The MSb of the slot is one if vacant and zero if occupied
