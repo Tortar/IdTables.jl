@@ -8,6 +8,8 @@ using IndexedStructVectors
 using Random
 using Statistics
 
+include("dict.jl")
+
 """
     Setup a `size` length vector
     after `size*fract_shuffled` random delete and push pairs
@@ -71,8 +73,9 @@ function save_benchmark_plots(;
         ntrials= 5,
     )
     datatypes = [
-        IndexedStructVector,
+        IndexedStructVectors_Dict.IndexedStructVector,
         SlotMapStructVector,
+        SlotMapStructVector{48}
     ]
     # Test parameters
     sizes = Int[1E4, 1E5, 1E6, 1E7]
