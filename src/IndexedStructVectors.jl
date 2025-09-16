@@ -53,8 +53,8 @@ end
     lasti = getfield(a, :lasti)
     i = id_guess_to_index(isv, id, lasti)
     getindexi = ar -> @inbounds ar[i]
-    vals = unrolled_map(getindexi, values(comps)[2:end])
-    names = fieldnames(typeof(comps))[2:end]
+    vals = unrolled_map(getindexi, Base.tail(values(comps)))
+    names = Base.tail(fieldnames(typeof(comps)))
     return NamedTuple{names}(vals)
 end
 
