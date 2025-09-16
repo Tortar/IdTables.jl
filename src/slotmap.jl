@@ -119,7 +119,7 @@ end
 function Base.push!(isv::SlotMapStructVector, t::NamedTuple)
     comps, slots = getfield(isv, :components), getfield(isv, :slots)
     slots_len, free_head = getfield(isv, :slots_len), getfield(isv, :free_head)
-    fieldnames(typeof(comps))[2:end] !== keys(t) && error("Tuple fields do not match container fields")
+    Base.tail(fieldnames(typeof(comps))) !== keys(t) && error("Tuple fields do not match container fields")
     ID = getfield(comps, :ID)
     startlen = length(ID)%Int64
     if startlen ≥ val_mask(isv)
@@ -166,7 +166,7 @@ function Base.push!(isv::SlotMapStructVector, t::NamedTuple)
         push!(ID, new_id)
         setfield!(isv, :last_id, new_id)
     end
-    unrolled_map(push!, values(comps)[2:end], t)
+    unrolled_map(push!, Base.tail(values(comps)), t)
     return isv
 end
 
