@@ -206,10 +206,7 @@ function Base.in(id::Int64, isv::SlotMapStructVector)
     end
     slots = getfield(isv, :slots)
     @inbounds slot = slots[slot_idx]
-    if slot & ~val_mask(isv) != id & ~val_mask(isv)
-        return false
-    end
-    true
+    return slot & ~val_mask(isv) == id & ~val_mask(isv)
 end
 
 # Copied from base/array.jl because this is not a public function
