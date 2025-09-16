@@ -21,7 +21,6 @@ Base.eltype(::Keys)= Int64
 
 struct IndexedView{S}
     id::Int64
-    lasti::Int
     isv::S
 end
 
@@ -33,8 +32,7 @@ isvalid(a::IndexedView) = a in getfield(a, :isv)
     id, isv = getfield(a, :id), getfield(a, :isv)
     comps = getfield(isv, :components)
     f = getfield(comps, name)
-    lasti = getfield(a, :lasti)
-    i = id_guess_to_index(isv, id, lasti)
+    i = id_to_index(isv, id)
     @inbounds f[i]
 end
 
@@ -42,16 +40,14 @@ end
     id, isv = getfield(a, :id), getfield(a, :isv)
     comps = getfield(isv, :components)
     f = getfield(comps, name)
-    lasti = getfield(a, :lasti)
-    i = id_guess_to_index(isv, id, lasti)
+    i = id_to_index(isv, id)
     return (@inbounds f[i] = x)
 end
 
 @inline function getfields(a::IndexedView)
     id, isv = getfield(a, :id), getfield(a, :isv)
     comps = getfield(isv, :components)
-    lasti = getfield(a, :lasti)
-    i = id_guess_to_index(isv, id, lasti)
+    i = id_to_index(isv, id)
     getindexi = ar -> @inbounds ar[i]
     vals = unrolled_map(getindexi, Base.tail(values(comps)))
     names = Base.tail(fieldnames(typeof(comps)))
@@ -62,8 +58,7 @@ function Base.show(io::IO, ::MIME"text/plain", x::IndexedView)
     !isvalid(x) && return print(io, "InvalidIndexView(ID = $(getfield(x, :id)))")
     id, isv = getfield(x, :id), getfield(x, :isv)
     comps = getfield(isv, :components)
-    lasti = getfield(x, :lasti)
-    i = id_guess_to_index(isv, id, lasti)
+    i = id_to_index(isv, id)
     fields = NamedTuple(y => getfield(comps, y)[i] for y in fieldnames(typeof(comps)))
     return print(io, "IndexedView$fields")
 end

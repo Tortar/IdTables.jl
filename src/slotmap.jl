@@ -48,7 +48,7 @@ Base.getproperty(isv::SlotMapStructVector, name::Symbol) = getfield(isv, :compon
 
 lastkey(isv::SlotMapStructVector) = getfield(isv, :last_id)
 
-@inline function id_guess_to_index(isv::SlotMapStructVector, id::Int64, lasti::Int)
+@inline function id_to_index(isv::SlotMapStructVector, id::Int64)
     if id ∉ isv
         throw(KeyError(id))
     end
@@ -104,13 +104,13 @@ function Base.deleteat!(isv::SlotMapStructVector, i::Int)
 end
 
 function Base.delete!(isv::SlotMapStructVector, id::Int)
-    i = id_guess_to_index(isv, id, id)
+    i = id_to_index(isv, id)
     delete_id_index!(isv, id, i)
 end
 
 function Base.delete!(isv::SlotMapStructVector, a::IndexedView)
-    id, lasti = getfield(a, :id), getfield(a, :lasti)
-    i = id_guess_to_index(isv, id, lasti)
+    id = getfield(a, :id)
+    i = id_to_index(isv, id)
     delete_id_index!(isv, id, i)
 end
 
@@ -180,7 +180,10 @@ function Base.keys(isv::SlotMapStructVector)
 end
 
 @inline function Base.getindex(isv::SlotMapStructVector, id::Int64)
-    return IndexedView(id, id_guess_to_index(isv, id, id), isv)
+    if id ∉ isv
+        throw(KeyError(id))
+    end
+    return IndexedView(id, isv)
 end
 
 function slotidx(id, isv)
