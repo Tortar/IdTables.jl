@@ -10,7 +10,6 @@ end
 function SparseSetStructVector(components::NamedTuple)
     allequal(length.(values(components))) || error("All components must have equal length")
     len = length(first(components))
-    # Start with generation 0
     comps = merge((ID=collect(1:len),), components)
     SparseSetStructVector{typeof(comps)}(EMPTY_VEC, len, comps)
 end
