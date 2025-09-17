@@ -73,7 +73,6 @@ function save_benchmark_plots(;
         ntrials= 5,
     )
     datatypes = [
-        SparseSetStructVector,
         IndexedStructVectors_Dict.IndexedStructVector,
         SlotMapStructVector,
         SlotMapStructVector{48}
