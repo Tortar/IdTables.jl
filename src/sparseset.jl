@@ -1,5 +1,5 @@
 
-const EMPTY_VEC = Memory{UInt64}(undef, 0)
+const EMPTY_VEC = Memory{Int}(undef, 0)
 
 mutable struct SparseSetStructVector{C} <: AbstractIndexedStructVector
     idvec::Memory{Int}
