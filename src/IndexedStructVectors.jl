@@ -1,8 +1,12 @@
 module IndexedStructVectors
 
+isdefined(@__MODULE__, :Memory) || const Memory = Vector # Compat for Julia < 1.11
+
 using Unrolled
 
-export SlotMapStructVector, getfields, id, isvalid
+export SlotMapStructVector, SparseSetStructVector, getfields, id, isvalid
+
+abstract type AbstractIndexedStructVector end
 
 function remove!(a, i)
     @inbounds a[i], a[end] = a[end], a[i]
@@ -18,6 +22,10 @@ Base.iterate(k::Keys, state) = Base.iterate(k.ID, state)
 Base.IteratorSize(::Keys) = Base.HasLength()
 Base.length(k::Keys) = length(k.ID)
 Base.eltype(::Keys)= Int64
+
+function Base.keys(isv::AbstractIndexedStructVector)
+    return Keys(getfield(getfield(isv, :components), :ID))
+end
 
 struct IndexedView{S}
     id::Int64
@@ -63,6 +71,55 @@ function Base.show(io::IO, ::MIME"text/plain", x::IndexedView)
     return print(io, "IndexedView$fields")
 end
 
+Base.getproperty(isv::AbstractIndexedStructVector, name::Symbol) = getfield(isv, :components)[name]
+
+@inline function Base.getindex(isv::AbstractIndexedStructVector, id::Int)
+    id ∉ isv && throw(KeyError(id))
+    return IndexedView(id, isv)
+end
+
+function Base.deleteat!(isv::AbstractIndexedStructVector, i::Int)
+    comps = getfield(isv, :components)
+    ID = getfield(comps, :ID)
+    delete_id_index!(isv, ID[i], i)
+end
+
+function Base.delete!(isv::AbstractIndexedStructVector, id::Int)
+    i = id_to_index(isv, id)
+    delete_id_index!(isv, id, i)
+end
+
+function Base.delete!(isv::AbstractIndexedStructVector, a::IndexedView)
+    id = getfield(a, :id)
+    i = id_to_index(isv, id)
+    delete_id_index!(isv, id, i)
+end
+
+function Base.in(a::IndexedView, isv::AbstractIndexedStructVector)
+    getfield(a, :id) ∈ isv
+end
+
+lastkey(isv::AbstractIndexedStructVector) = getfield(isv, :last_id)
+
+# Copied from base/array.jl because this is not a public function
+# https://github.com/JuliaLang/julia/blob/v1.11.6/base/array.jl#L1042-L1056
+# Pick new memory size for efficiently growing an array
+# TODO: This should know about the size of our GC pools
+# Specifically we are wasting ~10% of memory for small arrays
+# by not picking memory sizes that max out a GC pool
+function overallocation(maxsize)
+    maxsize < 8 && return 8;
+    # compute maxsize = maxsize + 4*maxsize^(7/8) + maxsize/8
+    # for small n, we grow faster than O(n)
+    # for large n, we grow at O(n/8)
+    # and as we reach O(memory) for memory>>1MB,
+    # this means we end by adding about 10% of memory each time
+    exp2 = sizeof(maxsize) * 8 - Core.Intrinsics.ctlz_int(maxsize)
+    maxsize += (1 << div(exp2 * 7, 8)) * 4 + div(maxsize, 8)
+    return maxsize
+end
+
 include("slotmap.jl")
+include("sparseset.jl")
 
 end
