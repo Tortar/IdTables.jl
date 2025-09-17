@@ -36,7 +36,9 @@ function delete_id_index!(isv::SparseSetStructVector, id::Int, i::Int)
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
     @inbounds idvec[id] = 0
-    @inbounds idvec[ID[i]] = i
+	if i <= length(ID)
+    	@inbounds idvec[ID[i]] = i
+	end
     return isv
 end
 
