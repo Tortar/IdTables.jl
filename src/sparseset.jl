@@ -45,9 +45,9 @@ end
 function Base.push!(isv::SparseSetStructVector, t::NamedTuple)
     comps, idvec = getfield(isv, :components), getfield(isv, :idvec)
     lastid = getfield(isv, :last_id)
+    lastid == typemax(lastid) && error("SparseSetStructVector is out of capacity")
     Base.tail(fieldnames(typeof(comps))) !== keys(t) && error("Tuple fields do not match container fields")
     ID = getfield(comps, :ID)
-    lastid == typemax(lastid) && error("SparseSetStructVector is out of capacity")
     newid = lastid + 1
     setfield!(isv, :last_id, newid)
     push!(ID, newid)
