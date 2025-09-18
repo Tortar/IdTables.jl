@@ -81,6 +81,6 @@ function Base.in(id::Int, isv::SparseSetStructVector)
     idvec = getfield(isv, :idvec)
     idvec_len = length(idvec)
     iszero(idvec_len) && return 1 <= id <= lastkey(isv)  
-    idvec_len < id && return false 
+    1 <= id <= idvec_len || return false 
     return @inbounds idvec[id] != 0
 end
