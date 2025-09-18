@@ -1,14 +1,12 @@
 # Loosely based on data structures from https://github.com/orlp/slotmap
 
-isdefined(@__MODULE__, :Memory) || const Memory = Vector # Compat for Julia < 1.11
-
 const EMPTY_SLOTS = Memory{UInt64}(undef, 0)
 
 # There are a max of 2^NBITS-1 active elements allowed at a time
 # by default NBITS=32 so around 4 billion.
 # Deleting and pushing elements slowly leaks memory
 # at a rate of 8 bytes per 2^(63-NBITS) pairs of delete and push.
-mutable struct SlotMapStructVector{NBITS, C}
+mutable struct SlotMapStructVector{NBITS, C} <: AbstractIndexedStructVector
     # This stores the generation and index into components, 
     # or the next free slot if vacant.
     # The MSb of the slot is one if vacant and zero if occupied
@@ -43,10 +41,6 @@ end
 function gen_mask(isv::SlotMapStructVector)
     ~(UInt64(1) << 63) & ~val_mask(isv)
 end
-
-Base.getproperty(isv::SlotMapStructVector, name::Symbol) = getfield(isv, :components)[name]
-
-lastkey(isv::SlotMapStructVector) = getfield(isv, :last_id)
 
 @inline function id_to_index(isv::SlotMapStructVector, id::Int64)
     if id ∉ isv
@@ -95,23 +89,6 @@ function delete_id_index!(isv::SlotMapStructVector, id::Int64, i::Int)
         @inbounds slots[moved_slot_idx] = slots[moved_slot_idx] & ~val_mask(isv) | i
     end
     return isv
-end
-
-function Base.deleteat!(isv::SlotMapStructVector, i::Int)
-    comps = getfield(isv, :components)
-    ID = getfield(comps, :ID)
-    delete_id_index!(isv, ID[i], i)
-end
-
-function Base.delete!(isv::SlotMapStructVector, id::Int)
-    i = id_to_index(isv, id)
-    delete_id_index!(isv, id, i)
-end
-
-function Base.delete!(isv::SlotMapStructVector, a::IndexedView)
-    id = getfield(a, :id)
-    i = id_to_index(isv, id)
-    delete_id_index!(isv, id, i)
 end
 
 function Base.push!(isv::SlotMapStructVector, t::NamedTuple)
@@ -175,24 +152,10 @@ function Base.show(io::IO, ::MIME"text/plain", x::SlotMapStructVector{N, C}) whe
     return display(comps)
 end
 
-function Base.keys(isv::SlotMapStructVector)
-    return Keys(getfield(getfield(isv, :components), :ID))
-end
-
-@inline function Base.getindex(isv::SlotMapStructVector, id::Int64)
-    if id ∉ isv
-        throw(KeyError(id))
-    end
-    return IndexedView(id, isv)
-end
-
 function slotidx(id, isv)
     (id & val_mask(isv))%Int
 end
 
-function Base.in(a::IndexedView, isv::SlotMapStructVector)
-    getfield(a, :id) ∈ isv
-end
 function Base.in(id::Int64, isv::SlotMapStructVector)
     comps = getfield(isv, :components)
     slots_len, ID = getfield(isv, :slots_len), getfield(comps, :ID)
@@ -208,23 +171,4 @@ function Base.in(id::Int64, isv::SlotMapStructVector)
     slots = getfield(isv, :slots)
     @inbounds slot = slots[slot_idx]
     return slot & ~val_mask(isv) == id & ~val_mask(isv)
-end
-
-# Copied from base/array.jl because this is not a public function
-# https://github.com/JuliaLang/julia/blob/v1.11.6/base/array.jl#L1042-L1056
-
-# Pick new memory size for efficiently growing an array
-# TODO: This should know about the size of our GC pools
-# Specifically we are wasting ~10% of memory for small arrays
-# by not picking memory sizes that max out a GC pool
-function overallocation(maxsize)
-    maxsize < 8 && return 8;
-    # compute maxsize = maxsize + 4*maxsize^(7/8) + maxsize/8
-    # for small n, we grow faster than O(n)
-    # for large n, we grow at O(n/8)
-    # and as we reach O(memory) for memory>>1MB,
-    # this means we end by adding about 10% of memory each time
-    exp2 = sizeof(maxsize) * 8 - Core.Intrinsics.ctlz_int(maxsize)
-    maxsize += (1 << div(exp2 * 7, 8)) * 4 + div(maxsize, 8)
-    return maxsize
 end
