@@ -15,14 +15,10 @@ function SparseSetStructVector(components::NamedTuple)
 end
 
 @inline function id_to_index(isv::SparseSetStructVector, id::Int)
-    ID = getfield(getfield(isv, :components), :ID)
+    id ∉ isv && throw(KeyError(id))
     idvec = getfield(isv, :idvec)
-    idvec_len = length(idvec)
-    iszero(idvec_len) && return id ∈ eachindex(ID) ? id : throw(KeyError(id))
-    1 <= id <= idvec_len || throw(KeyError(id))
-    @inbounds i = idvec[id]
-    iszero(i) && throw(KeyError(id))
-    return i
+    iszero(length(idvec)) && return id
+    return @inbounds idvec[id]
 end
 
 function delete_id_index!(isv::SparseSetStructVector, id::Int, i::Int)
@@ -37,9 +33,7 @@ function delete_id_index!(isv::SparseSetStructVector, id::Int, i::Int)
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
     @inbounds idvec[id] = 0
-    if i <= length(ID)
-        @inbounds idvec[ID[i]] = i
-    end
+    i <= length(ID) && (@inbounds idvec[ID[i]] = i)
     return isv
 end
 
