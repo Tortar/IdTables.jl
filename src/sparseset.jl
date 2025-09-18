@@ -15,24 +15,25 @@ function SparseSetStructVector(components::NamedTuple)
 end
 
 @inline function id_to_index(isv::SparseSetStructVector, id::Int)
+    ID = getfield(getfield(isv, :components), :ID)
     idvec = getfield(isv, :idvec)
     idvec_len = length(idvec)
-    idvec_len == 0 && return 1 <= id <= lastkey(isv) ? id : throw(KeyError(id))
+    iszero(idvec_len) && return id ∈ eachindex(ID) ? id : throw(KeyError(id))
     1 <= id <= idvec_len || throw(KeyError(id))
     @inbounds i = idvec[id]
-    i == 0 && throw(KeyError(id))
+    iszero(i) && throw(KeyError(id))
     return i
 end
 
 function delete_id_index!(isv::SparseSetStructVector, id::Int, i::Int)
     comps, idvec = getfield(isv, :components), getfield(isv, :idvec)
+    ID = getfield(comps, :ID)
     if iszero(length(idvec))
         lastid = getfield(isv, :last_id)
         idvec = Memory{Int}(undef, lastid)
         idvec .= 1:lastid
         setfield!(isv, :idvec, idvec)
     end
-    ID = getfield(comps, :ID)
     removei! = a -> remove!(a, i)
     unrolled_map(removei!, values(comps))
     @inbounds idvec[id] = 0
@@ -44,10 +45,9 @@ end
 
 function Base.push!(isv::SparseSetStructVector, t::NamedTuple)
     comps, idvec = getfield(isv, :components), getfield(isv, :idvec)
-    lastid = getfield(isv, :last_id)
+    ID, lastid = getfield(comps, :ID), getfield(isv, :last_id)
     lastid == typemax(lastid) && error("SparseSetStructVector is out of capacity")
     Base.tail(fieldnames(typeof(comps))) !== keys(t) && error("Tuple fields do not match container fields")
-    ID = getfield(comps, :ID)
     newid = lastid + 1
     setfield!(isv, :last_id, newid)
     push!(ID, newid)
@@ -78,9 +78,10 @@ function Base.show(io::IO, ::MIME"text/plain", x::SparseSetStructVector{C}) wher
 end
 
 function Base.in(id::Int, isv::SparseSetStructVector)
+    ID = getfield(getfield(isv, :components), :ID)
     idvec = getfield(isv, :idvec)
     idvec_len = length(idvec)
-    iszero(idvec_len) && return 1 <= id <= lastkey(isv)  
+    iszero(idvec_len) && return id ∈ eachindex(ID) 
     1 <= id <= idvec_len || return false 
     return @inbounds idvec[id] != 0
 end
