@@ -18,7 +18,7 @@ end
     idvec = getfield(isv, :idvec)
     idvec_len = length(idvec)
     idvec_len == 0 && return 1 <= id <= lastkey(isv) ? id : throw(KeyError(id))
-    idvec_len < id && throw(KeyError(id))
+    1 <= id <= idvec_len || throw(KeyError(id))
     @inbounds i = idvec[id]
     i == 0 && throw(KeyError(id))
     return i
