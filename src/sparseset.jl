@@ -10,7 +10,7 @@ end
 function SparseSetStructVector(components::NamedTuple)
     allequal(length.(values(components))) || error("All components must have equal length")
     len = length(first(components))
-    comps = merge((ID=collect(1:len),), components)
+    comps = merge((id=collect(1:len),), components)
     SparseSetStructVector{typeof(comps)}(EMPTY_VEC, len, comps)
 end
 
@@ -23,7 +23,7 @@ end
 
 function delete_id_index!(isv::SparseSetStructVector, id::Int, i::Int)
     comps, idvec = getfield(isv, :components), getfield(isv, :idvec)
-    ID = getfield(comps, :ID)
+    ID = getfield(comps, :id)
     if iszero(length(idvec))
         lastid = getfield(isv, :last_id)
         idvec = Memory{Int}(undef, lastid)
@@ -39,7 +39,7 @@ end
 
 function Base.push!(isv::SparseSetStructVector, t::NamedTuple)
     comps, idvec = getfield(isv, :components), getfield(isv, :idvec)
-    ID, lastid = getfield(comps, :ID), getfield(isv, :last_id)
+    ID, lastid = getfield(comps, :id), getfield(isv, :last_id)
     lastid == typemax(lastid) && error("SparseSetStructVector is out of capacity")
     Base.tail(fieldnames(typeof(comps))) !== keys(t) && error("Tuple fields do not match container fields")
     newid = lastid + 1
@@ -72,7 +72,7 @@ function Base.show(io::IO, ::MIME"text/plain", x::SparseSetStructVector{C}) wher
 end
 
 function Base.in(id::Int, isv::SparseSetStructVector)
-    ID = getfield(getfield(isv, :components), :ID)
+    ID = getfield(getfield(isv, :components), :id)
     idvec = getfield(isv, :idvec)
     idvec_len = length(idvec)
     iszero(idvec_len) && return id ∈ eachindex(ID) 

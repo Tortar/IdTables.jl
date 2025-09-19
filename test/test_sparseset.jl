@@ -41,15 +41,15 @@ using Test
 
         push!(s, (num = 111, tag = 'z'))
         new_id = IndexedStructVectors.lastkey(s)
-        @test new_id == s[new_id].ID == id(s[new_id]) == 5
+        @test new_id == s[new_id].id == id(s[new_id]) == 5
         @test new_id in collect(keys(s))
         @test s[new_id].num == 111
 
         delete!(s, 4)
         ids_after = collect(keys(s))
         @test (4 in ids_after) == false
-        @test s.ID[2] == 5
-        @test s[s.ID[2]].num == 111
+        @test s.id[2] == 5
+        @test s[s.id[2]].num == 111
         @test length(ids_after) == 3
 
         @test_throws KeyError delete!(s, 9999)

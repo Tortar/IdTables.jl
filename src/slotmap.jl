@@ -29,7 +29,7 @@ function SlotMapStructVector{NBITS}(components::NamedTuple) where {NBITS}
         error(lazy"SlotMapStructVector can store at most $(val_mask) elements but got $(len) elements.")
     end
     # Start with generation 0
-    comps = merge((ID=collect(Int64(1):Int64(len)),), components)
+    comps = merge((id=collect(Int64(1):Int64(len)),), components)
     SlotMapStructVector{NBITS, typeof(comps)}(EMPTY_SLOTS, Int64(0), Int64(0), Int64(len), comps)
 end
 SlotMapStructVector(components::NamedTuple) = SlotMapStructVector{32}(components)
@@ -57,7 +57,7 @@ end
 
 function delete_id_index!(isv::SlotMapStructVector, id::Int64, i::Int)
     comps, slots = getfield(isv, :components), getfield(isv, :slots)
-    slots_len, ID = getfield(isv, :slots_len), getfield(comps, :ID)
+    slots_len, ID = getfield(isv, :slots_len), getfield(comps, :id)
     startlen = length(ID)
     slot_idx = slotidx(id, isv)
     if iszero(slots_len)
@@ -95,7 +95,7 @@ function Base.push!(isv::SlotMapStructVector, t::NamedTuple)
     comps, slots = getfield(isv, :components), getfield(isv, :slots)
     slots_len, free_head = getfield(isv, :slots_len), getfield(isv, :free_head)
     Base.tail(fieldnames(typeof(comps))) !== keys(t) && error("Tuple fields do not match container fields")
-    ID = getfield(comps, :ID)
+    ID = getfield(comps, :id)
     startlen = length(ID)%Int64
     if startlen ≥ val_mask(isv)
         error(lazy"SlotMapStructVector can store at most $(val_mask(isv)) elements.")
@@ -158,7 +158,7 @@ end
 
 function Base.in(id::Int64, isv::SlotMapStructVector)
     comps = getfield(isv, :components)
-    slots_len, ID = getfield(isv, :slots_len), getfield(comps, :ID)
+    slots_len, ID = getfield(isv, :slots_len), getfield(comps, :id)
     iszero(slots_len) && return id ∈ eachindex(ID)
     if signbit(id)
         return false

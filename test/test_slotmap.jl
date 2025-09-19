@@ -13,7 +13,7 @@ function assert_invariants(isv::SlotMapStructVector)
     last_id = getfield(isv, :last_id)
     comp = getfield(isv, :components)
     @assert allequal(length.(values(comp)))
-    ID = comp.ID
+    ID = comp.id
     len = length(ID)
     @assert len ≤ val_mask(isv)
     @assert allunique(ID)
@@ -122,7 +122,7 @@ end
         push!(s, (num = 111, tag = 'z'))
         assert_invariants(s)
         new_id = IndexedStructVectors.lastkey(s)
-        @test new_id == s[new_id].ID == id(s[new_id]) == 1<<32 | 2
+        @test new_id == s[new_id].id == id(s[new_id]) == 1<<32 | 2
         @test new_id in collect(keys(s))
         @test s[new_id].num == 111
 
@@ -130,7 +130,7 @@ end
         assert_invariants(s)
         ids_after = collect(keys(s))
         @test (4 in ids_after) == false
-        @test s.ID[2] == new_id
+        @test s.id[2] == new_id
         @test s[new_id].num == 111
         @test length(ids_after) == 3
         @test 4 ∉ s
@@ -202,10 +202,10 @@ end
             0<<61 | Int64(6),
         ]
         for expected_last_id in expected_last_ids
-            @test s.ID == [1,2,3, expected_last_id]
+            @test s.id == [1,2,3, expected_last_id]
             delete!(s, expected_last_id)
             assert_invariants(s)
-            @test s.ID == [1,2,3]
+            @test s.id == [1,2,3]
             push!(s, (;num = 50))
             assert_invariants(s)
         end
@@ -228,10 +228,10 @@ end
             assert_invariants(s)
             push!(s, (;num = 50))
             assert_invariants(s)
-            @test s.ID == [4,2,3, expected_last_id]
+            @test s.id == [4,2,3, expected_last_id]
             delete!(s, expected_last_id)
             assert_invariants(s)
-            @test s.ID == [4,2,3]
+            @test s.id == [4,2,3]
         end
     end
 end
