@@ -24,7 +24,7 @@ Base.length(k::Keys) = length(k.ID)
 Base.eltype(::Keys)= Int64
 
 function Base.keys(isv::AbstractIndexedStructVector)
-    return Keys(getfield(getfield(isv, :components), :ID))
+    return Keys(getfield(getfield(isv, :components), :id))
 end
 
 struct IndexedView{S}
@@ -63,7 +63,7 @@ end
 end
 
 function Base.show(io::IO, ::MIME"text/plain", x::IndexedView)
-    !isvalid(x) && return print(io, "InvalidIndexView(ID = $(getfield(x, :id)))")
+    !isvalid(x) && return print(io, "InvalidIndexView(id = $(getfield(x, :id)))")
     id, isv = getfield(x, :id), getfield(x, :isv)
     comps = getfield(isv, :components)
     i = id_to_index(isv, id)
@@ -80,7 +80,7 @@ end
 
 function Base.deleteat!(isv::AbstractIndexedStructVector, i::Int)
     comps = getfield(isv, :components)
-    ID = getfield(comps, :ID)
+    ID = getfield(comps, :id)
     delete_id_index!(isv, ID[i], i)
 end
 
