@@ -2,6 +2,7 @@ module IndexedStructVectors
 
 isdefined(@__MODULE__, :Memory) || const Memory = Vector # Compat for Julia < 1.11
 
+using StructArrays
 using Unrolled
 
 export SlotMapStructVector, SparseSetStructVector, getfields, id, isvalid
@@ -24,21 +25,21 @@ Base.length(k::Keys) = length(k.ID)
 Base.eltype(::Keys)= Int64
 
 function Base.keys(isv::AbstractIndexedStructVector)
-    return Keys(getfield(getfield(isv, :components), :id))
+    return Keys(getfield(getcomponents(isv), :id))
 end
 
-struct IndexedView{S}
+mutable struct IndexedView{S}
     id::Int64
     isv::S
 end
 
-id(a::IndexedView) = getfield(a, :id)
+getid(a::IndexedView) = getfield(a, :id)
 
 isvalid(a::IndexedView) = a in getfield(a, :isv)
 
 @inline function Base.getproperty(a::IndexedView, name::Symbol)
     id, isv = getfield(a, :id), getfield(a, :isv)
-    comps = getfield(isv, :components)
+    comps = getcomponents(isv)
     f = getfield(comps, name)
     i = id_to_index(isv, id)
     @inbounds f[i]
@@ -46,40 +47,35 @@ end
 
 @inline function Base.setproperty!(a::IndexedView, name::Symbol, x)
     id, isv = getfield(a, :id), getfield(a, :isv)
-    comps = getfield(isv, :components)
+    comps = getcomponents(isv)
     f = getfield(comps, name)
     i = id_to_index(isv, id)
     return (@inbounds f[i] = x)
 end
 
-@inline function getfields(a::IndexedView)
-    id, isv = getfield(a, :id), getfield(a, :isv)
-    comps = getfield(isv, :components)
-    i = id_to_index(isv, id)
-    getindexi = ar -> @inbounds ar[i]
-    vals = unrolled_map(getindexi, Base.tail(values(comps)))
-    names = Base.tail(fieldnames(typeof(comps)))
-    return NamedTuple{names}(vals)
-end
-
 function Base.show(io::IO, ::MIME"text/plain", x::IndexedView)
     !isvalid(x) && return print(io, "InvalidIndexView(id = $(getfield(x, :id)))")
     id, isv = getfield(x, :id), getfield(x, :isv)
-    comps = getfield(isv, :components)
+    comps = getcomponents(isv)
     i = id_to_index(isv, id)
     fields = NamedTuple(y => getfield(comps, y)[i] for y in fieldnames(typeof(comps)))
     return print(io, "IndexedView$fields")
 end
 
-Base.getproperty(isv::AbstractIndexedStructVector, name::Symbol) = getfield(isv, :components)[name]
+Base.getproperty(isv::AbstractIndexedStructVector, name::Symbol) = getcomponents(isv)[name]
 
 @inline function Base.getindex(isv::AbstractIndexedStructVector, id::Int)
+    i = id_to_index(isv, id)
+    return getindex(getfield(isv, :components), i)
+end
+
+@inline function Base.view(isv::AbstractIndexedStructVector, id::Int)
     id ∉ isv && throw(KeyError(id))
     return IndexedView(id, isv)
 end
 
 function Base.deleteat!(isv::AbstractIndexedStructVector, i::Int)
-    comps = getfield(isv, :components)
+    comps = getcomponents(isv)
     ID = getfield(comps, :id)
     delete_id_index!(isv, ID[i], i)
 end
@@ -118,6 +114,8 @@ function overallocation(maxsize)
     maxsize += (1 << div(exp2 * 7, 8)) * 4 + div(maxsize, 8)
     return maxsize
 end
+
+getcomponents(isv::AbstractIndexedStructVector) = getfield(getfield(isv, :components), :components)
 
 include("slotmap.jl")
 include("sparseset.jl")
