@@ -21,8 +21,8 @@ mutable struct SlotMapStructVector{NBITS, C} <: AbstractIndexedStructVector
     const components::C
 end
 
-function SlotMapStructVector{NBITS}(components::NamedTuple) where {NBITS}
-    allequal(length.(values(components))) || error("All components must have equal length")
+function SlotMapStructVector{NBITS}(; components...) where {NBITS}
+    components = NamedTuple(components)
     len = length(first(components))
     val_mask = (UInt64(1) << NBITS) - 1
     if len > val_mask
@@ -30,9 +30,10 @@ function SlotMapStructVector{NBITS}(components::NamedTuple) where {NBITS}
     end
     # Start with generation 0
     comps = merge((id=collect(Int64(1):Int64(len)),), components)
-    SlotMapStructVector{NBITS, typeof(comps)}(EMPTY_SLOTS, Int64(0), Int64(0), Int64(len), comps)
+    scomps = StructVector(; comps...)
+    SlotMapStructVector{NBITS, typeof(scomps)}(EMPTY_SLOTS, Int64(0), Int64(0), Int64(len), scomps)
 end
-SlotMapStructVector(components::NamedTuple) = SlotMapStructVector{32}(components)
+SlotMapStructVector(; components...) = SlotMapStructVector{32}(; components...)
 
 function val_mask(isv::SlotMapStructVector{NBITS}) where {NBITS}
     (UInt64(1) << NBITS) - 1
@@ -56,7 +57,7 @@ end
 end
 
 function delete_id_index!(isv::SlotMapStructVector, id::Int64, i::Int)
-    comps, slots = getfield(isv, :components), getfield(isv, :slots)
+    comps, slots = getcomponents(isv), getfield(isv, :slots)
     slots_len, ID = getfield(isv, :slots_len), getfield(comps, :id)
     startlen = length(ID)
     slot_idx = slotidx(id, isv)
@@ -92,7 +93,7 @@ function delete_id_index!(isv::SlotMapStructVector, id::Int64, i::Int)
 end
 
 function Base.push!(isv::SlotMapStructVector, t::NamedTuple)
-    comps, slots = getfield(isv, :components), getfield(isv, :slots)
+    comps, slots = getcomponents(isv), getfield(isv, :slots)
     slots_len, free_head = getfield(isv, :slots_len), getfield(isv, :free_head)
     Base.tail(fieldnames(typeof(comps))) !== keys(t) && error("Tuple fields do not match container fields")
     ID = getfield(comps, :id)
@@ -157,7 +158,7 @@ function slotidx(id, isv)
 end
 
 function Base.in(id::Int64, isv::SlotMapStructVector)
-    comps = getfield(isv, :components)
+    comps = getcomponents(isv)
     slots_len, ID = getfield(isv, :slots_len), getfield(comps, :id)
     iszero(slots_len) && return id ∈ eachindex(ID)
     if signbit(id)

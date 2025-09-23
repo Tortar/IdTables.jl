@@ -11,7 +11,7 @@ function assert_invariants(isv::SlotMapStructVector)
     slots_len = getfield(isv, :slots_len)
     free_head = getfield(isv, :free_head)
     last_id = getfield(isv, :last_id)
-    comp = getfield(isv, :components)
+    comp = IndexedStructVectors.getcomponents(isv)
     @assert allequal(length.(values(comp)))
     ID = comp.id
     len = length(ID)
@@ -80,17 +80,17 @@ end
 
 @testset "SlotMapStructVector" begin
     @testset "construction" begin
-        s = SlotMapStructVector((x = [10, 20, 30], y = ["a", "b", "c"]))
+        s = SlotMapStructVector(x = [10, 20, 30], y = ["a", "b", "c"])
         assert_invariants(s)
         @test length(collect(keys(s))) == 3
         @test IndexedStructVectors.lastkey(s) == 3
-        @test_throws ErrorException SlotMapStructVector((x = [1,2], y = ["a"]))
+        @test_throws ArgumentError SlotMapStructVector(x = [1,2], y = ["a"])
     end
 
-    @testset "getindex/getproperty/setproperty!/getfields" begin
-        s = SlotMapStructVector((num = [1,2,3], name = ["x","y","z"]))
+    @testset "getindex/getproperty/setproperty!" begin
+        s = SlotMapStructVector(num = [1,2,3], name = ["x","y","z"])
         assert_invariants(s)
-        a = s[2]
+        a = @view(s[2])
 
         @test typeof(a) <: IndexedStructVectors.IndexedView
         @test a.num == 2
@@ -98,15 +98,10 @@ end
 
         a.num = 42
         @test s[2].num == a.num == 42
-
-        nt = getfields(s[2])
-        @test nt.num == 42
-        @test nt.name == "y"
-        @test length(nt) == 2
     end
 
     @testset "deleteat!/delete!/push!" begin
-        s = SlotMapStructVector((num = [10,20,30,40], tag = ['a','b','c','d']))
+        s = SlotMapStructVector(num = [10,20,30,40], tag = ['a','b','c','d'])
         assert_invariants(s)
 
         ids_before = collect(keys(s))
@@ -122,7 +117,7 @@ end
         push!(s, (num = 111, tag = 'z'))
         assert_invariants(s)
         new_id = IndexedStructVectors.lastkey(s)
-        @test new_id == s[new_id].id == id(s[new_id]) == 1<<32 | 2
+        @test new_id == s[new_id].id == 1<<32 | 2
         @test new_id in collect(keys(s))
         @test s[new_id].num == 111
 
@@ -141,7 +136,7 @@ end
         @test_throws KeyError delete!(s, 9999)
 
         # pushing initially empty
-        s = SlotMapStructVector((num = Int[], tag = Char[]))
+        s = SlotMapStructVector(num = Int[], tag = Char[])
         ids = Int64[]
         assert_invariants(s)
         for i in 1:100
@@ -168,10 +163,10 @@ end
 
     @testset "test logic for dead slots" begin
         # if NBITS=2 capacity is limited to 3 elements
-        @test_throws ErrorException SlotMapStructVector{2}((;num = [10,20,30,40]))
-        s = SlotMapStructVector{2}((;num = [10,20,30]))
+        @test_throws ErrorException SlotMapStructVector{2}(num = [10,20,30,40])
+        s = SlotMapStructVector{2}(num = [10,20,30])
         @test_throws ErrorException push!(s, (; num=10))
-        s = SlotMapStructVector{2}((;num = [10,20,30]))
+        s = SlotMapStructVector{2}(num = [10,20,30])
         deleteat!(s, 3)
         assert_invariants(s)
         push!(s, (; num=10))
@@ -187,7 +182,7 @@ end
         setfield!(s, :free_head, 0)
         @test_throws ErrorException push!(s, (; num=10))
 
-        s = SlotMapStructVector{61}((;num = [10,20,30,40]))
+        s = SlotMapStructVector{61}(num = [10,20,30,40])
         # As the last id is deleted and pushed repeatedly, it should get the following
         # ids.
         expected_last_ids = [
@@ -210,7 +205,7 @@ end
             assert_invariants(s)
         end
 
-        s = SlotMapStructVector{61}((;num = [10,20,30,40]))
+        s = SlotMapStructVector{61}(num = [10,20,30,40])
         delete!(s, Int64(1))
         # As the first id is deleted and pushed repeatedly, it should get the following
         # ids.

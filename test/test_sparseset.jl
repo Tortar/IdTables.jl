@@ -4,15 +4,15 @@ using Test
 
 @testset "SparseSetStructVector" begin
     @testset "construction" begin
-        s = SparseSetStructVector((x = [10, 20, 30], y = ["a", "b", "c"]))
+        s = SparseSetStructVector(x = [10, 20, 30], y = ["a", "b", "c"])
         @test length(collect(keys(s))) == 3
         @test IndexedStructVectors.lastkey(s) == 3
-        @test_throws ErrorException SparseSetStructVector((x = [1,2], y = ["a"]))
+        @test_throws ArgumentError SparseSetStructVector(x = [1,2], y = ["a"])
     end
 
-    @testset "getindex/getproperty/setproperty!/getfields" begin
-        s = SparseSetStructVector((num = [1,2,3], name = ["x","y","z"]))
-        a = s[2]
+    @testset "getindex/getproperty/setproperty!" begin
+        s = SparseSetStructVector(num = [1,2,3], name = ["x","y","z"])
+        a = @view(s[2])
 
         @test typeof(a) <: IndexedStructVectors.IndexedView
         @test a.num == 2
@@ -20,15 +20,10 @@ using Test
 
         a.num = 42
         @test s[2].num == a.num == 42
-
-        nt = getfields(s[2])
-        @test nt.num == 42
-        @test nt.name == "y"
-        @test length(nt) == 2
     end
 
     @testset "deleteat!/delete!/push!" begin
-        s = SparseSetStructVector((num = [10,20,30,40], tag = ['a','b','c','d']))
+        s = SparseSetStructVector(num = [10,20,30,40], tag = ['a','b','c','d'])
 
         ids_before = collect(keys(s))
         @test ids_before == [1,2,3,4]
@@ -41,7 +36,7 @@ using Test
 
         push!(s, (num = 111, tag = 'z'))
         new_id = IndexedStructVectors.lastkey(s)
-        @test new_id == s[new_id].id == id(s[new_id]) == 5
+        @test new_id == s[new_id].id == 5
         @test new_id in collect(keys(s))
         @test s[new_id].num == 111
 

@@ -60,17 +60,6 @@ end
     return (@inbounds f[i] = x)
 end
 
-@inline function getfields(a::IndexedView)
-    id, isv = getfield(a, :id), getfield(a, :isv)
-    comps = getfield(isv, :components)
-    lasti = getfield(a, :lasti)
-    i = id_guess_to_index(isv, id, lasti)
-    getindexi = ar -> @inbounds ar[i]
-    vals = unrolled_map(getindexi, values(comps)[2:end])
-    names = fieldnames(typeof(comps))[2:end]
-    return NamedTuple{names}(vals)
-end
-
 function Base.show(io::IO, ::MIME"text/plain", x::IndexedView)
     !isvalid(x) && return print(io, "InvalidIndexView(ID = $(getfield(x, :id)))")
     id, isv = getfield(x, :id), getfield(x, :isv)
@@ -152,6 +141,10 @@ function Base.keys(isv::IndexedStructVector)
 end
 
 @inline function Base.getindex(isv::IndexedStructVector, id::Int)
+    return IndexedView(id, id_guess_to_index(isv, id, id), isv)
+end
+
+@inline function Base.view(isv::IndexedStructVector, id::Int)
     return IndexedView(id, id_guess_to_index(isv, id, id), isv)
 end
 
