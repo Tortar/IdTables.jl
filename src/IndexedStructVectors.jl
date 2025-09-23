@@ -28,7 +28,7 @@ function Base.keys(isv::AbstractIndexedStructVector)
     return Keys(getfield(getcomponents(isv), :id))
 end
 
-mutable struct IndexedView{S}
+struct IndexedView{S}
     id::Int64
     isv::S
 end
