@@ -5,7 +5,7 @@ isdefined(@__MODULE__, :Memory) || const Memory = Vector # Compat for Julia < 1.
 using StructArrays
 using Unrolled
 
-export SlotMapStructVector, SparseSetStructVector, id, isvalid
+export SlotMapStructVector, SparseSetStructVector, getid, isvalid
 
 abstract type AbstractIndexedStructVector end
 
