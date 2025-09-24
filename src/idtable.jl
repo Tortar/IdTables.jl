@@ -58,4 +58,8 @@ Base.getproperty(tsm::IdTable, name::Symbol) = getproperty(data(tsm), name)
 
 Base.propertynames(tsm::IdTable) = propertynames(data(tsm))
 
+Base.keys(tsm::IdTable) = keys(data(tsm))
+
+ids(tsm::IdTable) = keys(tsm)
+
 lastid(tsm::IdTable) = lastid(data(tsm))
