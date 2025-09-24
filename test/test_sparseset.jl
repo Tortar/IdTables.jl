@@ -6,7 +6,7 @@ using Test
     @testset "construction" begin
         s = SparseSetStructVector(x = [10, 20, 30], y = ["a", "b", "c"])
         @test length(collect(keys(s))) == 3
-        @test IndexedStructVectors.lastkey(s) == 3
+        @test IndexedStructVectors.lastid(s) == 3
         @test_throws ArgumentError SparseSetStructVector(x = [1,2], y = ["a"])
     end
 
@@ -14,7 +14,7 @@ using Test
         s = SparseSetStructVector(num = [1,2,3], name = ["x","y","z"])
         a = @view(s[2])
 
-        @test typeof(a) <: IndexedStructVectors.IndexedView
+        @test typeof(a) <: IndexedStructVectors.IdView
         @test a.num == 2
         @test a.name == "y"
 
@@ -35,7 +35,7 @@ using Test
         @test 1 ∈ ids_after
 
         push!(s, (num = 111, tag = 'z'))
-        new_id = IndexedStructVectors.lastkey(s)
+        new_id = IndexedStructVectors.lastid(s)
         @test new_id == s[new_id].id == 5
         @test new_id in collect(keys(s))
         @test s[new_id].num == 111

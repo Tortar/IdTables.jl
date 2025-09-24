@@ -13,4 +13,5 @@ using Aqua, Test
 
     include("test_sparseset.jl")
     include("test_slotmap.jl")
+    include("test_table_interface.jl")
 end

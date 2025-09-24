@@ -18,7 +18,7 @@ julia> s = IndexedStructVector((name = ["alice","bob"], age = [30, 40])) # initi
 IndexedStructVector{ID::Vector{Int64}, name::Vector{String}, age::Vector{Int64}}(ID = [1, 2], name = ["alice", "bob"], age = [30, 40])
 
 julia> x = s[1]
-IndexedView(ID = 1, name = "alice", age = 30)
+IdView(ID = 1, name = "alice", age = 30)
 
 julia> x.name
 "alice"
