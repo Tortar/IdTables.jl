@@ -83,7 +83,7 @@ end
         s = SlotMapStructVector(x = [10, 20, 30], y = ["a", "b", "c"])
         assert_invariants(s)
         @test length(collect(keys(s))) == 3
-        @test IndexedStructVectors.lastkey(s) == 3
+        @test IndexedStructVectors.lastid(s) == 3
         @test_throws ArgumentError SlotMapStructVector(x = [1,2], y = ["a"])
     end
 
@@ -92,7 +92,7 @@ end
         assert_invariants(s)
         a = @view(s[2])
 
-        @test typeof(a) <: IndexedStructVectors.IndexedView
+        @test typeof(a) <: IndexedStructVectors.IdView
         @test a.num == 2
         @test a.name == "y"
 
@@ -116,7 +116,7 @@ end
 
         push!(s, (num = 111, tag = 'z'))
         assert_invariants(s)
-        new_id = IndexedStructVectors.lastkey(s)
+        new_id = IndexedStructVectors.lastid(s)
         @test new_id == s[new_id].id == 1<<32 | 2
         @test new_id in collect(keys(s))
         @test s[new_id].num == 111
@@ -141,13 +141,13 @@ end
         assert_invariants(s)
         for i in 1:100
             push!(s, (num = i, tag = Char(i)))
-            push!(ids, IndexedStructVectors.lastkey(s))
+            push!(ids, IndexedStructVectors.lastid(s))
             assert_invariants(s)
         end
         delete!(s, pop!(ids))
         for i in 101:1000
             push!(s, (num = i, tag = Char(i)))
-            push!(ids, IndexedStructVectors.lastkey(s))
+            push!(ids, IndexedStructVectors.lastid(s))
             assert_invariants(s)
         end
         while !isempty(ids)
@@ -156,7 +156,7 @@ end
         end
         for i in 1:100
             push!(s, (num = i, tag = Char(i)))
-            push!(ids, IndexedStructVectors.lastkey(s))
+            push!(ids, IndexedStructVectors.lastid(s))
             assert_invariants(s)
         end
     end
