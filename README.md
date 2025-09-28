@@ -41,16 +41,7 @@ julia> delete!(table, 2); # delete row with id 2
 
 julia> table[2] # now 2 is no longer a valid id
 ERROR: KeyError: key 2 not found
-Stacktrace:
- [1] id_to_index
-   @ ~/.julia/dev/IdTables/src/slotmap.jl:48 [inlined]
- [2] getindex
-   @ ~/.julia/dev/IdTables/src/idvectors.jl:64 [inlined]
- [3] getindex(tsm::IdTable{SlotMapStructVector{32, StructArrays.StructVector{…}}}, id::Int64)
-   @ IdTables ~/.julia/dev/IdTables/src/idtable.jl:41
- [4] top-level scope
-   @ REPL[9]:1
-Some type information was truncated. Use `show(err)` to see complete types.
+...
 
 julia> sum(table.age) # this will use the stored age vector
 55
