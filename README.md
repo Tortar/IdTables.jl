@@ -12,9 +12,9 @@ also the struct vectors types `SlotMapStructVector` and `SparseSetStructVector`,
 of an `IdTable`, are available.
 
 Differently from other packages such as `DataFrames.jl`, `TypedTables.jl`, etc..., each row of an `IdTable` is assigned a stable
-identifier when it's added to the table. This can then be used to index into the container allowing to support `O(1)` access, addition
-and deletion of ID-backed rows without compromising the performance of operations on single homogeneous fields, unlike a dictionary
-of structs.
+identifier when it's added to the table which can then be used to index into the container. This allows to support `O(1)` access,
+addition and deletion of ID-backed rows without compromising the performance of operations on single homogeneous fields, unlike
+with a dictionary of structs.
 
 ## Examples
 
