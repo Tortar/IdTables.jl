@@ -5,13 +5,16 @@
 [![Coverage](https://codecov.io/gh/Tortar/IdTables.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Tortar/IdTables.jl)
 [![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
-`IdTables.jl` implements containers with stable identifiers storing data with a structure-of-vectors layout. Differently from other dataframes implementations as `DataFrames.jl`, `TypedTables.jl`, etc..., each
-row is assigned a stable identifier when initialized which can then be used to index into the container.
-This allows to support `O(1)` access, addition and deletion of ID-backed rows, without compromising the performance of operations of single homogeneous fields of the structure, unlike a vector/dictionary of structs.
+`IdTables.jl` implements containers with stable identifiers storing data with a structure-of-vectors layout.
 
-The main type exported by the library is `IdTable`, which is a type compatible with the `Tables.jl`. Additionally, 
-also the struct vectors which internally are used to store the data of an `IdTable` are also 
-available: `SlotMapStructVector` and `SparseSetStructVector`.
+The main type exported by the library is `IdTable`, which is a type compatible with the `Tables.jl` interface. Additionally, 
+also the struct vectors types `SlotMapStructVector` and `SparseSetStructVector`, which internally are used to store the data
+of an `IdTable`, are available.
+
+Differently from other packages such as `DataFrames.jl`, `TypedTables.jl`, etc..., each row of an `IdTable` is assigned a stable
+identifier when it's added to the table. This can then be used to index into the container allowing to support `O(1)` access, addition
+and deletion of ID-backed rows without compromising the performance of operations on single homogeneous fields, unlike a dictionary
+of structs.
 
 ## Examples
 
@@ -55,4 +58,5 @@ julia> sum(table.age) # this will use the stored age vector
 
 ## Contributing
 
-Contributions are welcome! If you encounter any issues, have suggestions for improvements, or would like to add new features, feel free to open an issue or submit a pull request.
+Contributions are welcome! If you encounter any issues, have suggestions for improvements, or would like to add new features,
+feel free to open an issue or submit a pull request.
