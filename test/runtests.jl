@@ -1,13 +1,13 @@
 
-using IndexedStructVectors
+using IdTables
 using Aqua, Test
 
-@testset "IndexedStructVectors.jl" begin
+@testset "IdTables.jl" begin
 
     if "CI" in keys(ENV)
         @testset "Code quality (Aqua.jl)" begin
-            Aqua.test_all(IndexedStructVectors, deps_compat=false)
-            Aqua.test_deps_compat(IndexedStructVectors, check_extras=false)
+            Aqua.test_all(IdTables, deps_compat=false)
+            Aqua.test_deps_compat(IdTables, check_extras=false)
         end
     end
 

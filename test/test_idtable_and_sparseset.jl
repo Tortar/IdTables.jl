@@ -1,5 +1,5 @@
 
-using IndexedStructVectors
+using IdTables
 using Test
 
 for (type, name) in [
@@ -10,7 +10,7 @@ for (type, name) in [
         @testset "construction" begin
             s = type(x = [10, 20, 30], y = ["a", "b", "c"])
             @test length(collect(keys(s))) == 3
-            @test IndexedStructVectors.lastid(s) == 3
+            @test IdTables.lastid(s) == 3
             @test_throws ArgumentError type(x = [1,2], y = ["a"])
         end
 
@@ -18,7 +18,7 @@ for (type, name) in [
             s = type(num = [1,2,3], name = ["x","y","z"])
             a = @view(s[2])
 
-            @test typeof(a) <: IndexedStructVectors.IdView
+            @test typeof(a) <: IdTables.IdRowView
             @test a.num == 2
             @test a.name == "y"
 
@@ -39,7 +39,7 @@ for (type, name) in [
             @test 1 ∈ ids_after
 
             push!(s, (num = 111, tag = 'z'))
-            new_id = IndexedStructVectors.lastid(s)
+            new_id = IdTables.lastid(s)
             @test new_id == s[new_id].id == 5
             @test new_id in collect(keys(s))
             @test s[new_id].num == 111

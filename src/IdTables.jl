@@ -1,4 +1,4 @@
-module IndexedStructVectors
+module IdTables
 
 isdefined(@__MODULE__, :Memory) || const Memory = Vector # Compat for Julia < 1.11
 

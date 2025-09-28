@@ -22,18 +22,18 @@ end
 
 ids(isv::AbstractIndexedStructVector) = keys(isv)
 
-struct IdView{S}
+struct IdRowView{S}
     id::Int64
     isv::S
 end
 
-getid(a::IdView) = getfield(a, :id)
+getid(a::IdRowView) = getfield(a, :id)
 
-isvalid(a::IdView) = a in getfield(a, :isv)
+isvalid(a::IdRowView) = a in getfield(a, :isv)
 
 Base.propertynames(isv::AbstractIndexedStructVector) = propertynames(getfield(isv, :components))
 
-@inline function Base.getproperty(a::IdView, name::Symbol)
+@inline function Base.getproperty(a::IdRowView, name::Symbol)
     id, isv = getfield(a, :id), getfield(a, :isv)
     comps = getcomponents(isv)
     f = getfield(comps, name)
@@ -41,7 +41,7 @@ Base.propertynames(isv::AbstractIndexedStructVector) = propertynames(getfield(is
     @inbounds f[i]
 end
 
-@inline function Base.setproperty!(a::IdView, name::Symbol, x)
+@inline function Base.setproperty!(a::IdRowView, name::Symbol, x)
     id, isv = getfield(a, :id), getfield(a, :isv)
     comps = getcomponents(isv)
     f = getfield(comps, name)
@@ -49,13 +49,13 @@ end
     return (@inbounds f[i] = x)
 end
 
-function Base.show(io::IO, ::MIME"text/plain", x::IdView)
+function Base.show(io::IO, ::MIME"text/plain", x::IdRowView)
     !isvalid(x) && return print(io, "InvalidIndexView(id = $(getfield(x, :id)))")
     id, isv = getfield(x, :id), getfield(x, :isv)
     comps = getcomponents(isv)
     i = id_to_index(isv, id)
     fields = NamedTuple(y => getfield(comps, y)[i] for y in fieldnames(typeof(comps)))
-    return print(io, "IdView$fields")
+    return print(io, "IdRowView$fields")
 end
 
 Base.getproperty(isv::AbstractIndexedStructVector, name::Symbol) = getcomponents(isv)[name]
@@ -67,7 +67,7 @@ end
 
 @inline function Base.view(isv::AbstractIndexedStructVector, id::Int)
     id ∉ isv && throw(KeyError(id))
-    return IdView(id, isv)
+    return IdRowView(id, isv)
 end
 
 function Base.deleteat!(isv::AbstractIndexedStructVector, i::Int)
@@ -81,13 +81,13 @@ function Base.delete!(isv::AbstractIndexedStructVector, id::Int)
     delete_id_index!(isv, id, i)
 end
 
-function Base.delete!(isv::AbstractIndexedStructVector, a::IdView)
+function Base.delete!(isv::AbstractIndexedStructVector, a::IdRowView)
     id = getfield(a, :id)
     i = id_to_index(isv, id)
     delete_id_index!(isv, id, i)
 end
 
-function Base.in(a::IdView, isv::AbstractIndexedStructVector)
+function Base.in(a::IdRowView, isv::AbstractIndexedStructVector)
     getfield(a, :id) ∈ isv
 end
 

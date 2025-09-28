@@ -1,8 +1,8 @@
 
 # for testing purposes
-module IndexedStructVectors_Dict
+module IdTables_Dict
 
-using IndexedStructVectors.Unrolled
+using IdTables.Unrolled
 
 mutable struct IndexedStructVector{C}
     del::Bool
@@ -32,17 +32,17 @@ Base.IteratorSize(::Keys) = Base.HasLength()
 Base.length(k::Keys) = length(k.ID)
 Base.eltype(::Keys)= Int64
 
-struct IdView{S}
+struct IdRowView{S}
     id::Int64
     lasti::Int
     isv::S
 end
 
-id(a::IdView) = getfield(a, :id)
+id(a::IdRowView) = getfield(a, :id)
 
-isvalid(a::IdView) = a in getfield(a, :isv)
+isvalid(a::IdRowView) = a in getfield(a, :isv)
 
-@inline function Base.getproperty(a::IdView, name::Symbol)
+@inline function Base.getproperty(a::IdRowView, name::Symbol)
     id, isv = getfield(a, :id), getfield(a, :isv)
     comps = getfield(isv, :components)
     f = getfield(comps, name)
@@ -51,7 +51,7 @@ isvalid(a::IdView) = a in getfield(a, :isv)
     @inbounds f[i]
 end
 
-@inline function Base.setproperty!(a::IdView, name::Symbol, x)
+@inline function Base.setproperty!(a::IdRowView, name::Symbol, x)
     id, isv = getfield(a, :id), getfield(a, :isv)
     comps = getfield(isv, :components)
     f = getfield(comps, name)
@@ -60,14 +60,14 @@ end
     return (@inbounds f[i] = x)
 end
 
-function Base.show(io::IO, ::MIME"text/plain", x::IdView)
+function Base.show(io::IO, ::MIME"text/plain", x::IdRowView)
     !isvalid(x) && return print(io, "InvalidIndexView(ID = $(getfield(x, :id)))")
     id, isv = getfield(x, :id), getfield(x, :isv)
     comps = getfield(isv, :components)
     lasti = getfield(x, :lasti)
     i = id_guess_to_index(isv, id, lasti)
     fields = NamedTuple(y => getfield(comps, y)[i] for y in fieldnames(typeof(comps)))
-    return print(io, "IdView$fields")
+    return print(io, "IdRowView$fields")
 end
 
 Base.getproperty(isv::IndexedStructVector, name::Symbol) = getfield(isv, :components)[name]
@@ -112,7 +112,7 @@ function Base.delete!(isv::IndexedStructVector, id::Int)
     delete_id_index!(isv, id, i)
 end
 
-function Base.delete!(isv::IndexedStructVector, a::IdView)
+function Base.delete!(isv::IndexedStructVector, a::IdRowView)
     id, lasti = getfield(a, :id), getfield(a, :lasti)
     i = id_guess_to_index(isv, id, lasti)
     delete_id_index!(isv, id, i)
@@ -141,14 +141,14 @@ function Base.keys(isv::IndexedStructVector)
 end
 
 @inline function Base.getindex(isv::IndexedStructVector, id::Int)
-    return IdView(id, id_guess_to_index(isv, id, id), isv)
+    return IdRowView(id, id_guess_to_index(isv, id, id), isv)
 end
 
 @inline function Base.view(isv::IndexedStructVector, id::Int)
-    return IdView(id, id_guess_to_index(isv, id, id), isv)
+    return IdRowView(id, id_guess_to_index(isv, id, id), isv)
 end
 
-function Base.in(a::IdView, isv::IndexedStructVector)
+function Base.in(a::IdRowView, isv::IndexedStructVector)
     id, comps = getfield(a, :id), getfield(isv, :components)
     del, ID = getfield(isv, :del), getfield(comps, :ID)
     !del && return 1 <= id <= length(ID)

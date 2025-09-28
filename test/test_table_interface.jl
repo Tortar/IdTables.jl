@@ -1,5 +1,5 @@
 
-using IndexedStructVectors
+using IdTables
 using Test
 using Tables
 

@@ -48,11 +48,11 @@ Base.deleteat!(tsm::IdTable, i::Int) = deleteat!(data(tsm), i)
 
 Base.delete!(tsm::IdTable, id::Int) = delete!(data(tsm), id)
 
-Base.delete!(tsm::IdTable, a::IdView) = delete!(data(tsm), a)
+Base.delete!(tsm::IdTable, a::IdRowView) = delete!(data(tsm), a)
 
 Base.in(id::Int, tsm::IdTable) = in(a, data(tsm))
 
-Base.in(a::IdView, tsm::IdTable) = in(a, data(tsm))
+Base.in(a::IdRowView, tsm::IdTable) = in(a, data(tsm))
 
 Base.getproperty(tsm::IdTable, name::Symbol) = getproperty(data(tsm), name)
 

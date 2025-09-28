@@ -4,7 +4,7 @@
 # in the working directory
 
 using Chairmarks
-using IndexedStructVectors
+using IdTables
 using Random
 using Statistics
 
@@ -73,7 +73,7 @@ function save_benchmark_plots(;
         ntrials= 5,
     )
     datatypes = [
-        IndexedStructVectors_Dict.IndexedStructVector,
+        IdTables_Dict.IndexedStructVector,
         SlotMapStructVector,
         SlotMapStructVector{48}
     ]
