@@ -1,7 +1,7 @@
 name = "IdTables"
-uuid = "943997de-97ed-46fb-843d-45d8ceac30b4"
+uuid = "0cab796c-4e47-5d3e-808d-798fc581da82"
 authors = ["Adriano Meligrana <adrianomeligrana@proton.me>", "Nathan Zimmerberg"]
-version = "0.2.0"
+version = "0.1.0"
 
 [deps]
 StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
